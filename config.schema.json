@@ -1,0 +1,130 @@
+{
+  "$defs": {
+    "__schema0": {
+      "const": 1,
+      "default": 1,
+      "type": "number"
+    },
+    "__schema1": {
+      "default": "../..",
+      "minLength": 1,
+      "type": "string"
+    },
+    "__schema10": {
+      "maximum": 64,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "__schema2": {
+      "default": [
+        "src/**/*",
+        "app/**/*",
+        "pages/**/*",
+        "lib/**/*",
+        "server/**/*",
+        "*.{ts,tsx,js,jsx,mts,cts,mjs,cjs}"
+      ],
+      "items": {
+        "$ref": "#/$defs/__schema3"
+      },
+      "minItems": 1,
+      "type": "array"
+    },
+    "__schema3": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "__schema4": {
+      "default": [
+        "**/node_modules/**",
+        "**/.next/**",
+        "**/dist/**",
+        "**/build/**",
+        "**/coverage/**",
+        "**/.git/**",
+        "**/.ai/**",
+        "**/*.generated.*"
+      ],
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "__schema5": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "__schema6": {
+      "default": [
+        "auto"
+      ],
+      "items": {
+        "$ref": "#/$defs/__schema7"
+      },
+      "minItems": 1,
+      "type": "array"
+    },
+    "__schema7": {
+      "anyOf": [
+        {
+          "enum": [
+            "typescript",
+            "node",
+            "react",
+            "nextjs",
+            "nestjs"
+          ],
+          "type": "string"
+        },
+        {
+          "const": "auto",
+          "type": "string"
+        }
+      ]
+    },
+    "__schema8": {
+      "default": ".ai/code-map",
+      "minLength": 1,
+      "type": "string"
+    },
+    "__schema9": {
+      "default": false,
+      "type": "boolean"
+    }
+  },
+  "$id": "urn:ai-code-map:config:1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "concurrency": {
+      "$ref": "#/$defs/__schema10"
+    },
+    "exclude": {
+      "$ref": "#/$defs/__schema4"
+    },
+    "frameworks": {
+      "$ref": "#/$defs/__schema6"
+    },
+    "include": {
+      "$ref": "#/$defs/__schema2"
+    },
+    "includePrivateSymbols": {
+      "$ref": "#/$defs/__schema9"
+    },
+    "output": {
+      "$ref": "#/$defs/__schema8"
+    },
+    "root": {
+      "$ref": "#/$defs/__schema1"
+    },
+    "tsconfig": {
+      "$ref": "#/$defs/__schema5"
+    },
+    "version": {
+      "$ref": "#/$defs/__schema0"
+    }
+  },
+  "title": "ai-code-map configuration",
+  "type": "object"
+}

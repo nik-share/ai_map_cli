@@ -1,0 +1,126 @@
+{
+  "$defs": {
+    "__schema0": {
+      "minLength": 1,
+      "type": "string"
+    }
+  },
+  "$id": "urn:ai-code-map:project:1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "counts": {
+      "additionalProperties": false,
+      "properties": {
+        "diagnostics": {
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "files": {
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "relations": {
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "symbols": {
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "files",
+        "symbols",
+        "relations",
+        "diagnostics"
+      ],
+      "type": "object"
+    },
+    "entryPoints": {
+      "items": {
+        "$ref": "#/$defs/__schema0"
+      },
+      "type": "array"
+    },
+    "frameworks": {
+      "items": {
+        "enum": [
+          "typescript",
+          "node",
+          "react",
+          "nextjs",
+          "nestjs"
+        ],
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "name": {
+      "type": "string"
+    },
+    "packageManager": {
+      "type": "string"
+    },
+    "pathAliases": {
+      "additionalProperties": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "propertyNames": {
+        "type": "string"
+      },
+      "type": "object"
+    },
+    "schemaVersion": {
+      "const": 1,
+      "type": "number"
+    },
+    "tsconfig": {
+      "$ref": "#/$defs/__schema0"
+    },
+    "workspaces": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "entryPoints": {
+            "items": {
+              "$ref": "#/$defs/__schema0"
+            },
+            "type": "array"
+          },
+          "name": {
+            "type": "string"
+          },
+          "path": {
+            "$ref": "#/$defs/__schema0"
+          }
+        },
+        "required": [
+          "name",
+          "path",
+          "entryPoints"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "name",
+    "frameworks",
+    "pathAliases",
+    "entryPoints",
+    "workspaces",
+    "counts"
+  ],
+  "title": "ai-code-map project record",
+  "type": "object"
+}

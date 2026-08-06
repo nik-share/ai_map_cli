@@ -1,0 +1,83 @@
+{
+  "$defs": {
+    "__schema0": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "version": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "version"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "urn:ai-code-map:manifest:1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "analyzerVersion": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "analyzers": {
+      "items": {
+        "$ref": "#/$defs/__schema0"
+      },
+      "type": "array"
+    },
+    "configHash": {
+      "pattern": "^[a-f0-9]{64}$",
+      "type": "string"
+    },
+    "schemaVersion": {
+      "const": 1,
+      "type": "number"
+    },
+    "semanticResolver": {
+      "$ref": "#/$defs/__schema0"
+    },
+    "sourceFiles": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "hash": {
+            "pattern": "^[a-f0-9]{64}$",
+            "type": "string"
+          },
+          "path": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "hash"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "syntaxParser": {
+      "$ref": "#/$defs/__schema0"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "analyzerVersion",
+    "semanticResolver",
+    "syntaxParser",
+    "analyzers",
+    "configHash",
+    "sourceFiles"
+  ],
+  "title": "ai-code-map manifest record",
+  "type": "object"
+}

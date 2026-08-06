@@ -1,0 +1,242 @@
+{
+  "$defs": {
+    "__schema0": {
+      "minLength": 1,
+      "type": "string"
+    }
+  },
+  "$id": "urn:ai-code-map:file:1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "env": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "exports": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "default": {
+            "type": "boolean"
+          },
+          "line": {
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991,
+            "type": "integer"
+          },
+          "local": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "typeOnly": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name",
+          "default",
+          "line"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "frameworks": {
+      "items": {
+        "enum": [
+          "typescript",
+          "node",
+          "react",
+          "nextjs",
+          "nestjs"
+        ],
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "hash": {
+      "pattern": "^[a-f0-9]{64}$",
+      "type": "string"
+    },
+    "id": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "imports": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "external": {
+            "type": "boolean"
+          },
+          "kind": {
+            "enum": [
+              "esm",
+              "commonjs"
+            ],
+            "type": "string"
+          },
+          "line": {
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991,
+            "type": "integer"
+          },
+          "resolved": {
+            "$ref": "#/$defs/__schema0"
+          },
+          "source": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "specifiers": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "imported": {
+                  "type": "string"
+                },
+                "local": {
+                  "type": "string"
+                },
+                "typeOnly": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "imported",
+                "local"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "source",
+          "specifiers",
+          "external",
+          "kind",
+          "line"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "language": {
+      "enum": [
+        "ts",
+        "tsx",
+        "js",
+        "jsx",
+        "mts",
+        "cts",
+        "mjs",
+        "cjs"
+      ],
+      "type": "string"
+    },
+    "lines": {
+      "maximum": 9007199254740991,
+      "minimum": 0,
+      "type": "integer"
+    },
+    "operations": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "api": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "filesystem",
+              "http",
+              "database",
+              "queue"
+            ],
+            "type": "string"
+          },
+          "line": {
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "kind",
+          "api",
+          "line"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "path": {
+      "$ref": "#/$defs/__schema0"
+    },
+    "schemaVersion": {
+      "const": 1,
+      "type": "number"
+    },
+    "symbolIds": {
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "syntax": {
+      "additionalProperties": false,
+      "properties": {
+        "factCount": {
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "fallbackFrom": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "hadErrors": {
+          "type": "boolean"
+        },
+        "parser": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "parser",
+        "factCount",
+        "hadErrors"
+      ],
+      "type": "object"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "id",
+    "path",
+    "language",
+    "frameworks",
+    "hash",
+    "lines",
+    "imports",
+    "exports",
+    "symbolIds",
+    "env",
+    "operations",
+    "syntax"
+  ],
+  "title": "ai-code-map file record",
+  "type": "object"
+}

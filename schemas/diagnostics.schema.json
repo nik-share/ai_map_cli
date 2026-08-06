@@ -1,0 +1,59 @@
+{
+  "$id": "urn:ai-code-map:diagnostics:1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "items": {
+    "additionalProperties": false,
+    "properties": {
+      "code": {
+        "enum": [
+          "parse-error",
+          "unresolved-import",
+          "invalid-config",
+          "unsupported-file",
+          "analysis-error",
+          "parser-fallback"
+        ],
+        "type": "string"
+      },
+      "column": {
+        "exclusiveMinimum": 0,
+        "maximum": 9007199254740991,
+        "type": "integer"
+      },
+      "file": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "line": {
+        "exclusiveMinimum": 0,
+        "maximum": 9007199254740991,
+        "type": "integer"
+      },
+      "message": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "schemaVersion": {
+        "const": 1,
+        "type": "number"
+      },
+      "severity": {
+        "enum": [
+          "info",
+          "warning",
+          "error"
+        ],
+        "type": "string"
+      }
+    },
+    "required": [
+      "schemaVersion",
+      "code",
+      "severity",
+      "message"
+    ],
+    "type": "object"
+  },
+  "title": "ai-code-map diagnostics artifact",
+  "type": "array"
+}

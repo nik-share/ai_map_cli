@@ -1,0 +1,6 @@
+{
+  "name": "typescript-node-fixture",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts"
+}

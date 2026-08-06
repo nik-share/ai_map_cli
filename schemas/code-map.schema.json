@@ -1,0 +1,785 @@
+{
+  "$defs": {
+    "__schema0": {
+      "additionalProperties": false,
+      "properties": {
+        "analyzerVersion": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "analyzers": {
+          "items": {
+            "$ref": "#/$defs/__schema1"
+          },
+          "type": "array"
+        },
+        "configHash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "type": "string"
+        },
+        "schemaVersion": {
+          "const": 1,
+          "type": "number"
+        },
+        "semanticResolver": {
+          "$ref": "#/$defs/__schema1"
+        },
+        "sourceFiles": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "hash": {
+                "pattern": "^[a-f0-9]{64}$",
+                "type": "string"
+              },
+              "path": {
+                "$ref": "#/$defs/__schema2"
+              }
+            },
+            "required": [
+              "path",
+              "hash"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "syntaxParser": {
+          "$ref": "#/$defs/__schema1"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "analyzerVersion",
+        "semanticResolver",
+        "syntaxParser",
+        "analyzers",
+        "configHash",
+        "sourceFiles"
+      ],
+      "type": "object"
+    },
+    "__schema1": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "version": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "version"
+      ],
+      "type": "object"
+    },
+    "__schema10": {
+      "exclusiveMinimum": 0,
+      "maximum": 9007199254740991,
+      "type": "integer"
+    },
+    "__schema11": {
+      "exclusiveMinimum": 0,
+      "maximum": 9007199254740991,
+      "type": "integer"
+    },
+    "__schema12": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        },
+        {
+          "items": {
+            "$ref": "#/$defs/__schema12"
+          },
+          "type": "array"
+        },
+        {
+          "additionalProperties": {
+            "$ref": "#/$defs/__schema12"
+          },
+          "propertyNames": {
+            "type": "string"
+          },
+          "type": "object"
+        }
+      ]
+    },
+    "__schema13": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "confidence": {
+            "maximum": 1,
+            "minimum": 0,
+            "type": "number"
+          },
+          "from": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "origin": {
+            "additionalProperties": false,
+            "properties": {
+              "analyzer": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "classification": {
+                "enum": [
+                  "exact",
+                  "framework-derived",
+                  "heuristic",
+                  "derived"
+                ],
+                "type": "string"
+              },
+              "explanation": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "file": {
+                "$ref": "#/$defs/__schema2"
+              },
+              "line": {
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991,
+                "type": "integer"
+              },
+              "range": {
+                "$ref": "#/$defs/__schema7"
+              }
+            },
+            "required": [
+              "file",
+              "line",
+              "range",
+              "explanation",
+              "classification",
+              "analyzer"
+            ],
+            "type": "object"
+          },
+          "schemaVersion": {
+            "const": 1,
+            "type": "number"
+          },
+          "to": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "type": {
+            "enum": [
+              "imports",
+              "exports",
+              "reexports",
+              "calls",
+              "instantiates",
+              "renders",
+              "uses-hook",
+              "reads-state",
+              "depends-on",
+              "used-by",
+              "contains",
+              "references",
+              "injects",
+              "handles-route",
+              "consumes-dto",
+              "belongs-to-module",
+              "uses-layout"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "schemaVersion",
+          "from",
+          "type",
+          "to",
+          "confidence",
+          "origin"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "__schema14": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "enum": [
+              "parse-error",
+              "unresolved-import",
+              "invalid-config",
+              "unsupported-file",
+              "analysis-error",
+              "parser-fallback"
+            ],
+            "type": "string"
+          },
+          "column": {
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991,
+            "type": "integer"
+          },
+          "file": {
+            "$ref": "#/$defs/__schema2"
+          },
+          "line": {
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991,
+            "type": "integer"
+          },
+          "message": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "schemaVersion": {
+            "const": 1,
+            "type": "number"
+          },
+          "severity": {
+            "enum": [
+              "info",
+              "warning",
+              "error"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "schemaVersion",
+          "code",
+          "severity",
+          "message"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "__schema2": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "__schema3": {
+      "additionalProperties": false,
+      "properties": {
+        "counts": {
+          "additionalProperties": false,
+          "properties": {
+            "diagnostics": {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "files": {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "relations": {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "symbols": {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "files",
+            "symbols",
+            "relations",
+            "diagnostics"
+          ],
+          "type": "object"
+        },
+        "entryPoints": {
+          "items": {
+            "$ref": "#/$defs/__schema2"
+          },
+          "type": "array"
+        },
+        "frameworks": {
+          "items": {
+            "$ref": "#/$defs/__schema4"
+          },
+          "type": "array"
+        },
+        "name": {
+          "type": "string"
+        },
+        "packageManager": {
+          "type": "string"
+        },
+        "pathAliases": {
+          "additionalProperties": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "propertyNames": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "schemaVersion": {
+          "const": 1,
+          "type": "number"
+        },
+        "tsconfig": {
+          "$ref": "#/$defs/__schema2"
+        },
+        "workspaces": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "entryPoints": {
+                "items": {
+                  "$ref": "#/$defs/__schema2"
+                },
+                "type": "array"
+              },
+              "name": {
+                "type": "string"
+              },
+              "path": {
+                "$ref": "#/$defs/__schema2"
+              }
+            },
+            "required": [
+              "name",
+              "path",
+              "entryPoints"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "name",
+        "frameworks",
+        "pathAliases",
+        "entryPoints",
+        "workspaces",
+        "counts"
+      ],
+      "type": "object"
+    },
+    "__schema4": {
+      "enum": [
+        "typescript",
+        "node",
+        "react",
+        "nextjs",
+        "nestjs"
+      ],
+      "type": "string"
+    },
+    "__schema5": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "env": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "exports": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "default": {
+                  "type": "boolean"
+                },
+                "line": {
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991,
+                  "type": "integer"
+                },
+                "local": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "source": {
+                  "type": "string"
+                },
+                "typeOnly": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "name",
+                "default",
+                "line"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "frameworks": {
+            "items": {
+              "$ref": "#/$defs/__schema4"
+            },
+            "type": "array"
+          },
+          "hash": {
+            "pattern": "^[a-f0-9]{64}$",
+            "type": "string"
+          },
+          "id": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "imports": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "external": {
+                  "type": "boolean"
+                },
+                "kind": {
+                  "enum": [
+                    "esm",
+                    "commonjs"
+                  ],
+                  "type": "string"
+                },
+                "line": {
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991,
+                  "type": "integer"
+                },
+                "resolved": {
+                  "$ref": "#/$defs/__schema2"
+                },
+                "source": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "specifiers": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "imported": {
+                        "type": "string"
+                      },
+                      "local": {
+                        "type": "string"
+                      },
+                      "typeOnly": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "imported",
+                      "local"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                }
+              },
+              "required": [
+                "source",
+                "specifiers",
+                "external",
+                "kind",
+                "line"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "language": {
+            "enum": [
+              "ts",
+              "tsx",
+              "js",
+              "jsx",
+              "mts",
+              "cts",
+              "mjs",
+              "cjs"
+            ],
+            "type": "string"
+          },
+          "lines": {
+            "maximum": 9007199254740991,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "operations": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "api": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "kind": {
+                  "enum": [
+                    "filesystem",
+                    "http",
+                    "database",
+                    "queue"
+                  ],
+                  "type": "string"
+                },
+                "line": {
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "kind",
+                "api",
+                "line"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "path": {
+            "$ref": "#/$defs/__schema2"
+          },
+          "schemaVersion": {
+            "const": 1,
+            "type": "number"
+          },
+          "symbolIds": {
+            "items": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "syntax": {
+            "additionalProperties": false,
+            "properties": {
+              "factCount": {
+                "maximum": 9007199254740991,
+                "minimum": 0,
+                "type": "integer"
+              },
+              "fallbackFrom": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "hadErrors": {
+                "type": "boolean"
+              },
+              "parser": {
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "required": [
+              "parser",
+              "factCount",
+              "hadErrors"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "schemaVersion",
+          "id",
+          "path",
+          "language",
+          "frameworks",
+          "hash",
+          "lines",
+          "imports",
+          "exports",
+          "symbolIds",
+          "env",
+          "operations",
+          "syntax"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "__schema6": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "defaultExport": {
+            "type": "boolean"
+          },
+          "documentation": {
+            "type": "string"
+          },
+          "exported": {
+            "type": "boolean"
+          },
+          "facts": {
+            "additionalProperties": {
+              "$ref": "#/$defs/__schema12"
+            },
+            "propertyNames": {
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "file": {
+            "$ref": "#/$defs/__schema2"
+          },
+          "id": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "function",
+              "class",
+              "method",
+              "interface",
+              "type-alias",
+              "variable",
+              "react-component",
+              "react-hook",
+              "react-context",
+              "next-page",
+              "next-layout",
+              "next-route-handler",
+              "next-special-file",
+              "nest-module",
+              "nest-controller",
+              "nest-provider",
+              "nest-guard",
+              "nest-interceptor",
+              "nest-pipe",
+              "nest-filter",
+              "nest-gateway",
+              "dto",
+              "route"
+            ],
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "range": {
+            "$ref": "#/$defs/__schema7"
+          },
+          "schemaVersion": {
+            "const": 1,
+            "type": "number"
+          },
+          "signature": {
+            "type": "string"
+          },
+          "sourceHash": {
+            "pattern": "^[a-f0-9]{64}$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "schemaVersion",
+          "id",
+          "name",
+          "kind",
+          "file",
+          "range",
+          "exported",
+          "facts",
+          "sourceHash"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "__schema7": {
+      "additionalProperties": false,
+      "properties": {
+        "endColumn": {
+          "$ref": "#/$defs/__schema11"
+        },
+        "endLine": {
+          "$ref": "#/$defs/__schema10"
+        },
+        "startColumn": {
+          "$ref": "#/$defs/__schema9"
+        },
+        "startLine": {
+          "$ref": "#/$defs/__schema8"
+        }
+      },
+      "required": [
+        "startLine",
+        "startColumn",
+        "endLine",
+        "endColumn"
+      ],
+      "type": "object"
+    },
+    "__schema8": {
+      "exclusiveMinimum": 0,
+      "maximum": 9007199254740991,
+      "type": "integer"
+    },
+    "__schema9": {
+      "exclusiveMinimum": 0,
+      "maximum": 9007199254740991,
+      "type": "integer"
+    }
+  },
+  "$id": "urn:ai-code-map:complete:1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "diagnostics": {
+      "$ref": "#/$defs/__schema14"
+    },
+    "files": {
+      "$ref": "#/$defs/__schema5"
+    },
+    "manifest": {
+      "$ref": "#/$defs/__schema0"
+    },
+    "project": {
+      "$ref": "#/$defs/__schema3"
+    },
+    "relations": {
+      "$ref": "#/$defs/__schema13"
+    },
+    "symbols": {
+      "$ref": "#/$defs/__schema6"
+    }
+  },
+  "required": [
+    "manifest",
+    "project",
+    "files",
+    "symbols",
+    "relations",
+    "diagnostics"
+  ],
+  "title": "complete in-memory ai-code-map",
+  "type": "object"
+}

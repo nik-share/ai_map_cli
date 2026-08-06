@@ -1,0 +1,165 @@
+{
+  "$defs": {
+    "__schema0": {
+      "exclusiveMinimum": 0,
+      "maximum": 9007199254740991,
+      "type": "integer"
+    },
+    "__schema1": {
+      "exclusiveMinimum": 0,
+      "maximum": 9007199254740991,
+      "type": "integer"
+    },
+    "__schema2": {
+      "exclusiveMinimum": 0,
+      "maximum": 9007199254740991,
+      "type": "integer"
+    },
+    "__schema3": {
+      "exclusiveMinimum": 0,
+      "maximum": 9007199254740991,
+      "type": "integer"
+    },
+    "__schema4": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        },
+        {
+          "items": {
+            "$ref": "#/$defs/__schema4"
+          },
+          "type": "array"
+        },
+        {
+          "additionalProperties": {
+            "$ref": "#/$defs/__schema4"
+          },
+          "propertyNames": {
+            "type": "string"
+          },
+          "type": "object"
+        }
+      ]
+    }
+  },
+  "$id": "urn:ai-code-map:symbol:1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "defaultExport": {
+      "type": "boolean"
+    },
+    "documentation": {
+      "type": "string"
+    },
+    "exported": {
+      "type": "boolean"
+    },
+    "facts": {
+      "additionalProperties": {
+        "$ref": "#/$defs/__schema4"
+      },
+      "propertyNames": {
+        "type": "string"
+      },
+      "type": "object"
+    },
+    "file": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "id": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "kind": {
+      "enum": [
+        "function",
+        "class",
+        "method",
+        "interface",
+        "type-alias",
+        "variable",
+        "react-component",
+        "react-hook",
+        "react-context",
+        "next-page",
+        "next-layout",
+        "next-route-handler",
+        "next-special-file",
+        "nest-module",
+        "nest-controller",
+        "nest-provider",
+        "nest-guard",
+        "nest-interceptor",
+        "nest-pipe",
+        "nest-filter",
+        "nest-gateway",
+        "dto",
+        "route"
+      ],
+      "type": "string"
+    },
+    "name": {
+      "type": "string"
+    },
+    "range": {
+      "additionalProperties": false,
+      "properties": {
+        "endColumn": {
+          "$ref": "#/$defs/__schema3"
+        },
+        "endLine": {
+          "$ref": "#/$defs/__schema2"
+        },
+        "startColumn": {
+          "$ref": "#/$defs/__schema1"
+        },
+        "startLine": {
+          "$ref": "#/$defs/__schema0"
+        }
+      },
+      "required": [
+        "startLine",
+        "startColumn",
+        "endLine",
+        "endColumn"
+      ],
+      "type": "object"
+    },
+    "schemaVersion": {
+      "const": 1,
+      "type": "number"
+    },
+    "signature": {
+      "type": "string"
+    },
+    "sourceHash": {
+      "pattern": "^[a-f0-9]{64}$",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "id",
+    "name",
+    "kind",
+    "file",
+    "range",
+    "exported",
+    "facts",
+    "sourceHash"
+  ],
+  "title": "ai-code-map symbol record",
+  "type": "object"
+}
