@@ -35,9 +35,15 @@ interface ParsedNextRoute {
   params: string[];
 }
 
+const registeredNextJsAnalyzers = new WeakSet();
+
 export class NextJsAnalyzer implements FrameworkAnalyzer {
   readonly name = "nextjs";
   readonly version = "0.1.0-experimental";
+
+  constructor() {
+    registeredNextJsAnalyzers.add(this);
+  }
 
   supports(context: AnalysisContext): boolean {
     if (!APP_FILES_EXTENSIONS.has(path.extname(context.relativePath).toLowerCase())) return false;
@@ -138,6 +144,30 @@ export class NextJsAnalyzer implements FrameworkAnalyzer {
 
     return { symbols, relations, frameworks: ["nextjs"] };
   }
+}
+
+const nextJsSupports = NextJsAnalyzer.prototype.supports.bind(NextJsAnalyzer.prototype);
+const nextJsAnalyze = NextJsAnalyzer.prototype.analyze.bind(NextJsAnalyzer.prototype);
+
+/** Return immutable canonical methods only for an unmodified, directly constructed instance. */
+export function trustedNextJsAnalyzerMethods(analyzer: FrameworkAnalyzer):
+  | {
+      supports(context: AnalysisContext): boolean;
+      analyze(context: AnalysisContext): AnalysisContribution | Promise<AnalysisContribution>;
+    }
+  | undefined {
+  if (!registeredNextJsAnalyzers.has(analyzer)) return undefined;
+  if (Object.getPrototypeOf(analyzer) !== NextJsAnalyzer.prototype) return undefined;
+  if (Object.hasOwn(analyzer, "supports") || Object.hasOwn(analyzer, "analyze")) {
+    return undefined;
+  }
+  const name = Object.getOwnPropertyDescriptor(analyzer, "name");
+  const version = Object.getOwnPropertyDescriptor(analyzer, "version");
+  if (name?.value !== "nextjs" || version?.value !== "0.1.0-experimental") return undefined;
+  return {
+    supports: (context) => nextJsSupports(context),
+    analyze: (context) => nextJsAnalyze(context),
+  };
 }
 
 export default NextJsAnalyzer;

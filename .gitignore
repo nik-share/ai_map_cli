@@ -4,3 +4,8 @@ dist/
 coverage/
 .DS_Store
 *.tgz
+
+# Raw/private real-world benchmark evidence. Commit only reviewed aggregate reports.
+benchmarks/results/*.json
+benchmarks/results/*-provisional-*.md
+benchmarks/results/*-relation-quality-*.md

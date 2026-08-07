@@ -52,7 +52,7 @@
       ]
     }
   },
-  "$id": "urn:ai-code-map:symbol:1",
+  "$id": "urn:ai-code-map:symbol:4",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "properties": {
@@ -138,7 +138,7 @@
       "type": "object"
     },
     "schemaVersion": {
-      "const": 1,
+      "const": 4,
       "type": "number"
     },
     "signature": {

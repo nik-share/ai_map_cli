@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 
 import { z, type ZodType } from "zod";
 
+import { SCHEMA_VERSION } from "../src/constants.js";
 import {
   CodeMapSchema,
   ConfigSchema,
@@ -37,43 +38,43 @@ const targets: SchemaTarget[] = [
   },
   {
     file: "schemas/manifest.schema.json",
-    id: "urn:ai-code-map:manifest:1",
+    id: `urn:ai-code-map:manifest:${SCHEMA_VERSION}`,
     title: "ai-code-map manifest record",
     schema: ManifestRecordSchema,
   },
   {
     file: "schemas/project.schema.json",
-    id: "urn:ai-code-map:project:1",
+    id: `urn:ai-code-map:project:${SCHEMA_VERSION}`,
     title: "ai-code-map project record",
     schema: ProjectRecordSchema,
   },
   {
     file: "schemas/file.schema.json",
-    id: "urn:ai-code-map:file:1",
+    id: `urn:ai-code-map:file:${SCHEMA_VERSION}`,
     title: "ai-code-map file record",
     schema: FileRecordSchema,
   },
   {
     file: "schemas/symbol.schema.json",
-    id: "urn:ai-code-map:symbol:1",
+    id: `urn:ai-code-map:symbol:${SCHEMA_VERSION}`,
     title: "ai-code-map symbol record",
     schema: SymbolRecordSchema,
   },
   {
     file: "schemas/relation.schema.json",
-    id: "urn:ai-code-map:relation:1",
+    id: `urn:ai-code-map:relation:${SCHEMA_VERSION}`,
     title: "ai-code-map relation record",
     schema: RelationRecordSchema,
   },
   {
     file: "schemas/diagnostics.schema.json",
-    id: "urn:ai-code-map:diagnostics:1",
+    id: `urn:ai-code-map:diagnostics:${SCHEMA_VERSION}`,
     title: "ai-code-map diagnostics artifact",
     schema: z.array(DiagnosticRecordSchema),
   },
   {
     file: "schemas/code-map.schema.json",
-    id: "urn:ai-code-map:complete:1",
+    id: `urn:ai-code-map:complete:${SCHEMA_VERSION}`,
     title: "complete in-memory ai-code-map",
     schema: CodeMapSchema,
   },

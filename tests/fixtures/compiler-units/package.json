@@ -1,0 +1,16 @@
+{
+  "name": "compiler-units-fixture",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.13.1",
+  "workspaces": [
+    "packages/*"
+  ],
+  "dependencies": {
+    "@fixture/library": "workspace:^",
+    "react": "^19.1.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.2"
+  }
+}

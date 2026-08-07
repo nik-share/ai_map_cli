@@ -13,18 +13,7 @@
           },
           "type": "array"
         },
-        "configHash": {
-          "pattern": "^[a-f0-9]{64}$",
-          "type": "string"
-        },
-        "schemaVersion": {
-          "const": 1,
-          "type": "number"
-        },
-        "semanticResolver": {
-          "$ref": "#/$defs/__schema1"
-        },
-        "sourceFiles": {
+        "artifacts": {
           "items": {
             "additionalProperties": false,
             "properties": {
@@ -33,12 +22,240 @@
                 "type": "string"
               },
               "path": {
-                "$ref": "#/$defs/__schema2"
+                "enum": [
+                  "overview.md",
+                  "project.json",
+                  "files.jsonl",
+                  "symbols.jsonl",
+                  "relations.jsonl",
+                  "diagnostics.json"
+                ],
+                "type": "string"
               }
             },
             "required": [
               "path",
               "hash"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "configHash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "type": "string"
+        },
+        "integrityHash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "type": "string"
+        },
+        "producer": {
+          "additionalProperties": false,
+          "properties": {
+            "fingerprint": {
+              "pattern": "^[a-f0-9]{64}$",
+              "type": "string"
+            },
+            "id": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "kind": {
+              "enum": [
+                "built-in",
+                "custom"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "kind",
+            "fingerprint"
+          ],
+          "type": "object"
+        },
+        "schemaVersion": {
+          "const": 4,
+          "type": "number"
+        },
+        "semanticInputs": {
+          "items": {
+            "oneOf": [
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "hash": {
+                    "pattern": "^[a-f0-9]{64}$",
+                    "type": "string"
+                  },
+                  "kind": {
+                    "const": "file",
+                    "type": "string"
+                  },
+                  "path": {
+                    "$ref": "#/$defs/__schema3"
+                  }
+                },
+                "required": [
+                  "path",
+                  "kind",
+                  "hash"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "exists": {
+                    "type": "boolean"
+                  },
+                  "kind": {
+                    "const": "resolution-probe",
+                    "type": "string"
+                  },
+                  "path": {
+                    "$ref": "#/$defs/__schema3"
+                  },
+                  "scope": {
+                    "enum": [
+                      "project",
+                      "toolchain"
+                    ],
+                    "type": "string"
+                  },
+                  "targetKind": {
+                    "enum": [
+                      "file",
+                      "directory",
+                      "readable-file"
+                    ],
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "path",
+                  "kind",
+                  "scope",
+                  "targetKind",
+                  "exists"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "hash": {
+                    "pattern": "^[a-f0-9]{64}$",
+                    "type": "string"
+                  },
+                  "kind": {
+                    "const": "directory-listing",
+                    "type": "string"
+                  },
+                  "path": {
+                    "$ref": "#/$defs/__schema3"
+                  },
+                  "scope": {
+                    "enum": [
+                      "project",
+                      "toolchain"
+                    ],
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "path",
+                  "kind",
+                  "scope",
+                  "hash"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "kind": {
+                    "const": "symlink",
+                    "type": "string"
+                  },
+                  "path": {
+                    "$ref": "#/$defs/__schema3"
+                  },
+                  "scope": {
+                    "enum": [
+                      "project",
+                      "toolchain"
+                    ],
+                    "type": "string"
+                  },
+                  "target": {
+                    "$ref": "#/$defs/__schema3"
+                  }
+                },
+                "required": [
+                  "path",
+                  "kind",
+                  "scope",
+                  "target"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "hash": {
+                    "pattern": "^[a-f0-9]{64}$",
+                    "type": "string"
+                  },
+                  "kind": {
+                    "const": "toolchain-file",
+                    "type": "string"
+                  },
+                  "path": {
+                    "$ref": "#/$defs/__schema3"
+                  }
+                },
+                "required": [
+                  "path",
+                  "kind",
+                  "hash"
+                ],
+                "type": "object"
+              }
+            ]
+          },
+          "type": "array"
+        },
+        "semanticResolver": {
+          "$ref": "#/$defs/__schema1"
+        },
+        "sourceFiles": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "compilerUnit": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "hash": {
+                "pattern": "^[a-f0-9]{64}$",
+                "type": "string"
+              },
+              "lines": {
+                "maximum": 9007199254740991,
+                "minimum": 0,
+                "type": "integer"
+              },
+              "path": {
+                "$ref": "#/$defs/__schema2"
+              }
+            },
+            "required": [
+              "path",
+              "hash",
+              "compilerUnit",
+              "lines"
             ],
             "type": "object"
           },
@@ -51,11 +268,15 @@
       "required": [
         "schemaVersion",
         "analyzerVersion",
+        "producer",
         "semanticResolver",
         "syntaxParser",
         "analyzers",
         "configHash",
-        "sourceFiles"
+        "sourceFiles",
+        "semanticInputs",
+        "artifacts",
+        "integrityHash"
       ],
       "type": "object"
     },
@@ -88,6 +309,16 @@
       "type": "integer"
     },
     "__schema12": {
+      "exclusiveMinimum": 0,
+      "maximum": 9007199254740991,
+      "type": "integer"
+    },
+    "__schema13": {
+      "exclusiveMinimum": 0,
+      "maximum": 9007199254740991,
+      "type": "integer"
+    },
+    "__schema14": {
       "anyOf": [
         {
           "type": "string"
@@ -103,13 +334,13 @@
         },
         {
           "items": {
-            "$ref": "#/$defs/__schema12"
+            "$ref": "#/$defs/__schema14"
           },
           "type": "array"
         },
         {
           "additionalProperties": {
-            "$ref": "#/$defs/__schema12"
+            "$ref": "#/$defs/__schema14"
           },
           "propertyNames": {
             "type": "string"
@@ -118,7 +349,7 @@
         }
       ]
     },
-    "__schema13": {
+    "__schema15": {
       "items": {
         "additionalProperties": false,
         "properties": {
@@ -160,7 +391,7 @@
                 "type": "integer"
               },
               "range": {
-                "$ref": "#/$defs/__schema7"
+                "$ref": "#/$defs/__schema9"
               }
             },
             "required": [
@@ -174,7 +405,7 @@
             "type": "object"
           },
           "schemaVersion": {
-            "const": 1,
+            "const": 4,
             "type": "number"
           },
           "to": {
@@ -216,7 +447,7 @@
       },
       "type": "array"
     },
-    "__schema14": {
+    "__schema16": {
       "items": {
         "additionalProperties": false,
         "properties": {
@@ -227,7 +458,8 @@
               "invalid-config",
               "unsupported-file",
               "analysis-error",
-              "parser-fallback"
+              "parser-fallback",
+              "compiler-config"
             ],
             "type": "string"
           },
@@ -249,7 +481,7 @@
             "type": "string"
           },
           "schemaVersion": {
-            "const": 1,
+            "const": 4,
             "type": "number"
           },
           "severity": {
@@ -272,12 +504,73 @@
       "type": "array"
     },
     "__schema2": {
+      "$ref": "#/$defs/__schema3"
+    },
+    "__schema3": {
       "minLength": 1,
       "type": "string"
     },
-    "__schema3": {
+    "__schema4": {
       "additionalProperties": false,
       "properties": {
+        "compilerUnits": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "config": {
+                "$ref": "#/$defs/__schema2"
+              },
+              "extends": {
+                "items": {
+                  "$ref": "#/$defs/__schema2"
+                },
+                "type": "array"
+              },
+              "id": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "kind": {
+                "enum": [
+                  "configured",
+                  "fallback"
+                ],
+                "type": "string"
+              },
+              "pathAliases": {
+                "additionalProperties": {
+                  "items": {
+                    "$ref": "#/$defs/__schema3"
+                  },
+                  "type": "array"
+                },
+                "propertyNames": {
+                  "$ref": "#/$defs/__schema6"
+                },
+                "type": "object"
+              },
+              "references": {
+                "items": {
+                  "$ref": "#/$defs/__schema2"
+                },
+                "type": "array"
+              },
+              "root": {
+                "$ref": "#/$defs/__schema3"
+              }
+            },
+            "required": [
+              "id",
+              "kind",
+              "root",
+              "references",
+              "extends",
+              "pathAliases"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
         "counts": {
           "additionalProperties": false,
           "properties": {
@@ -318,7 +611,7 @@
         },
         "frameworks": {
           "items": {
-            "$ref": "#/$defs/__schema4"
+            "$ref": "#/$defs/__schema5"
           },
           "type": "array"
         },
@@ -331,17 +624,17 @@
         "pathAliases": {
           "additionalProperties": {
             "items": {
-              "type": "string"
+              "$ref": "#/$defs/__schema3"
             },
             "type": "array"
           },
           "propertyNames": {
-            "type": "string"
+            "$ref": "#/$defs/__schema6"
           },
           "type": "object"
         },
         "schemaVersion": {
-          "const": 1,
+          "const": 4,
           "type": "number"
         },
         "tsconfig": {
@@ -378,6 +671,7 @@
         "schemaVersion",
         "name",
         "frameworks",
+        "compilerUnits",
         "pathAliases",
         "entryPoints",
         "workspaces",
@@ -385,7 +679,7 @@
       ],
       "type": "object"
     },
-    "__schema4": {
+    "__schema5": {
       "enum": [
         "typescript",
         "node",
@@ -395,10 +689,18 @@
       ],
       "type": "string"
     },
-    "__schema5": {
+    "__schema6": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "__schema7": {
       "items": {
         "additionalProperties": false,
         "properties": {
+          "compilerUnit": {
+            "minLength": 1,
+            "type": "string"
+          },
           "env": {
             "items": {
               "type": "string"
@@ -441,7 +743,7 @@
           },
           "frameworks": {
             "items": {
-              "$ref": "#/$defs/__schema4"
+              "$ref": "#/$defs/__schema5"
             },
             "type": "array"
           },
@@ -567,7 +869,7 @@
             "$ref": "#/$defs/__schema2"
           },
           "schemaVersion": {
-            "const": 1,
+            "const": 4,
             "type": "number"
           },
           "symbolIds": {
@@ -608,6 +910,7 @@
         "required": [
           "schemaVersion",
           "id",
+          "compilerUnit",
           "path",
           "language",
           "frameworks",
@@ -624,7 +927,7 @@
       },
       "type": "array"
     },
-    "__schema6": {
+    "__schema8": {
       "items": {
         "additionalProperties": false,
         "properties": {
@@ -639,7 +942,7 @@
           },
           "facts": {
             "additionalProperties": {
-              "$ref": "#/$defs/__schema12"
+              "$ref": "#/$defs/__schema14"
             },
             "propertyNames": {
               "type": "string"
@@ -685,10 +988,10 @@
             "type": "string"
           },
           "range": {
-            "$ref": "#/$defs/__schema7"
+            "$ref": "#/$defs/__schema9"
           },
           "schemaVersion": {
-            "const": 1,
+            "const": 4,
             "type": "number"
           },
           "signature": {
@@ -714,20 +1017,20 @@
       },
       "type": "array"
     },
-    "__schema7": {
+    "__schema9": {
       "additionalProperties": false,
       "properties": {
         "endColumn": {
-          "$ref": "#/$defs/__schema11"
+          "$ref": "#/$defs/__schema13"
         },
         "endLine": {
-          "$ref": "#/$defs/__schema10"
+          "$ref": "#/$defs/__schema12"
         },
         "startColumn": {
-          "$ref": "#/$defs/__schema9"
+          "$ref": "#/$defs/__schema11"
         },
         "startLine": {
-          "$ref": "#/$defs/__schema8"
+          "$ref": "#/$defs/__schema10"
         }
       },
       "required": [
@@ -737,39 +1040,29 @@
         "endColumn"
       ],
       "type": "object"
-    },
-    "__schema8": {
-      "exclusiveMinimum": 0,
-      "maximum": 9007199254740991,
-      "type": "integer"
-    },
-    "__schema9": {
-      "exclusiveMinimum": 0,
-      "maximum": 9007199254740991,
-      "type": "integer"
     }
   },
-  "$id": "urn:ai-code-map:complete:1",
+  "$id": "urn:ai-code-map:complete:4",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "properties": {
     "diagnostics": {
-      "$ref": "#/$defs/__schema14"
+      "$ref": "#/$defs/__schema16"
     },
     "files": {
-      "$ref": "#/$defs/__schema5"
+      "$ref": "#/$defs/__schema7"
     },
     "manifest": {
       "$ref": "#/$defs/__schema0"
     },
     "project": {
-      "$ref": "#/$defs/__schema3"
+      "$ref": "#/$defs/__schema4"
     },
     "relations": {
-      "$ref": "#/$defs/__schema13"
+      "$ref": "#/$defs/__schema15"
     },
     "symbols": {
-      "$ref": "#/$defs/__schema6"
+      "$ref": "#/$defs/__schema8"
     }
   },
   "required": [

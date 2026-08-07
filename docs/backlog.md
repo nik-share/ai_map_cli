@@ -9,15 +9,19 @@
 - Replaceable syntax and semantic boundaries with safe fallback.
 - `init`, `scan`, `check`, and `show` only.
 - Zod-owned configuration/persisted schemas, stable IDs, evidence, confidence, hashes, and freshness.
+- Deterministic compiler units for multiple TypeScript configs, project references, workspace
+  boundaries, and unowned-file fallback analysis.
 - Focused security, malformed-source, determinism, API, and CLI behavioral tests.
 
-## Next milestone: Beta foundation
+## Next milestone: bounded context foundation
 
-1. Split analysis into correct per-`tsconfig` units, including project references and monorepo package boundaries.
-2. Mature and independently validate the existing experimental Next.js and NestJS analyzers before enabling either by default.
-3. Run the parser evaluation corpus on representative repositories and supported CI platforms; decide whether ast-grep stays dev-only, becomes optional, or becomes a default candidate observer.
-4. Add accuracy fixtures and precision/recall reporting for framework rule packs.
-5. Only after map accuracy is stable, add rebuildable local query/impact indexes, watch mode, lexical search, and an official-SDK read-only stdio MCP adapter.
+1. Add a deterministic, structured query API with strict output budgets, ranking, truncation, and omission accounting.
+2. Compare compact map context with relevant source slices and return the smaller useful representation.
+3. Profile and reduce peak memory on the three representative repositories before release approval.
+4. Mature and independently validate the existing experimental Next.js and NestJS analyzers before enabling either by default.
+5. Run the parser evaluation corpus on representative repositories and supported CI platforms; decide whether ast-grep stays dev-only, becomes optional, or becomes a default candidate observer.
+6. Add accuracy fixtures and precision/recall reporting for framework rule packs.
+7. Only after bounded retrieval is validated, add rebuildable local impact indexes, watch mode, lexical search, and an official-SDK read-only stdio MCP adapter.
 
 ## Deferred adapters
 

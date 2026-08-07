@@ -5,7 +5,7 @@ import { CONFIG_VERSION, DEFAULT_EXCLUDE, DEFAULT_INCLUDE, DEFAULT_OUTPUT } from
 import { CodeMapError, errorMessage } from "./errors.js";
 import { ConfigSchema } from "./schemas.js";
 import type { CodeMapConfig, FrameworkSelection, LoadCodeMapOptions } from "./types.js";
-import { toPosixPath } from "./utils/path.js";
+import { isSafeRegularFile, toPosixPath } from "./utils/path.js";
 import { atomicWriteIfChanged, isNotFound, stableJson } from "./utils/stable.js";
 
 export interface ResolvedConfiguration {
@@ -61,11 +61,9 @@ export async function findProjectRoot(start = process.cwd()): Promise<string> {
   }
 
   while (current !== path.dirname(current)) {
-    try {
-      await fs.access(path.join(current, "package.json"));
+    const packagePath = path.join(current, "package.json");
+    if (await isSafeRegularFile(current, packagePath)) {
       return await fs.realpath(current);
-    } catch (error) {
-      if (!isNotFound(error)) throw error;
     }
     const parent = path.dirname(current);
     current = parent;

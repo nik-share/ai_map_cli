@@ -1,0 +1,12 @@
+{
+  "files": [],
+  "references": [
+    { "path": "./packages/admin" },
+    { "path": "./packages/app" },
+    { "path": "./packages/app/tsconfig.node.json" },
+    { "path": "./packages/library" },
+    { "path": "./packages/overlap/tsconfig.a.json" },
+    { "path": "./packages/overlap/tsconfig.b.json" },
+    { "path": "./tsconfig.sibling.json" }
+  ]
+}

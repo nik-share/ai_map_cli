@@ -82,7 +82,8 @@ The scanner writes these deterministic files under the output directory (default
 - `relations.jsonl`
 - `diagnostics.json`
 
-`project.json` is tolerated as an additional file for tooling convenience.
+`project.json` is a required companion artifact. Loading or reusing a map validates it together with
+the manifest, JSONL records, diagnostics, and their cross-record ownership/count invariants.
 
 See [`docs/artifacts.md`](./docs/artifacts.md) and [`docs/schema.md`](./docs/schema.md) for exact field-level formats.
 
@@ -196,7 +197,9 @@ Freshness compares:
 - `show` is a single-symbol query, not a full search/index query language.
 - `Next.js` and `NestJS` analyzers are exported and available programmatically but are **experimental and default-off** in CLI because they are not in the default analyzer list.
 - Tree-sitter/ast-grep is not enabled in production scans. A pinned ast-grep development spike and microbenchmark exist, while TS/JS/React analysis remains compiler-authoritative.
-- Correct per-package/per-project-reference semantic programs are a Beta milestone; the alpha uses one selected root TypeScript configuration.
+- Compiler-unit discovery, deterministic file ownership, project references, extended configs, and
+  bounded fallback analysis are implemented. Complex conditional package exports and references
+  outside the selected root remain bounded limitations.
 - No planned Beta/Later capabilities are claimed by default.
 
 ## AI-agent instructions (copy/paste)

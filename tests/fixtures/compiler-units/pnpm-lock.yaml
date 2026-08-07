@@ -1,0 +1,15 @@
+lockfileVersion: '9.0'
+
+importers:
+  .:
+    dependencies:
+      '@fixture/library':
+        specifier: workspace:^
+        version: link:packages/library
+      react:
+        specifier: ^19.1.0
+        version: 19.1.1
+    devDependencies:
+      typescript:
+        specifier: ^5.9.2
+        version: 5.9.2

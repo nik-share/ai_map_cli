@@ -3,7 +3,7 @@ export { CodeMapError } from "./errors.js";
 export { initProject, createDefaultConfig, findProjectRoot } from "./config.js";
 export type { InitOptions, InitResult } from "./config.js";
 export { scanProject, createAnalyzer } from "./scan.js";
-export { loadCodeMap, buildOverview } from "./storage.js";
+export { loadCodeMap, buildOverview, computeManifestIntegrityHash } from "./storage.js";
 export { checkFreshness } from "./freshness.js";
 export { showSymbol, formatShowResult } from "./show.js";
 export {
@@ -19,13 +19,17 @@ export { ManypkgWorkspaceDiscovery, createWorkspaceDiscovery } from "./workspace
 export { GitIgnoreAdapter, createGitIgnoreAdapter } from "./ignore.js";
 export { TypeScriptSemanticResolver, createTypeScriptSemanticResolver } from "./semantic.js";
 export {
+  ArtifactIntegrityRecordSchema,
   CodeMapSchema,
+  CompilerUnitRecordSchema,
   ConfigSchema,
   DiagnosticRecordSchema,
   FileRecordSchema,
   ManifestRecordSchema,
+  ProducerRecordSchema,
   ProjectRecordSchema,
   RelationRecordSchema,
+  SemanticInputRecordSchema,
   SymbolRecordSchema,
 } from "./schemas.js";
 
@@ -33,8 +37,10 @@ export type {
   AnalysisContext,
   AnalysisContribution,
   Analyzer,
+  ArtifactIntegrityRecord,
   CodeMap,
   CodeMapConfig,
+  CompilerUnitRecord,
   DiagnosticCode,
   DiagnosticRecord,
   DiagnosticSeverity,
@@ -57,6 +63,7 @@ export type {
   ManifestRecord,
   MapCounts,
   ProjectRecord,
+  ProducerRecord,
   RelationEvidenceClassification,
   RelationOrigin,
   RelationRecord,
@@ -76,6 +83,9 @@ export type {
   SyntaxParseResult,
   SyntaxSummary,
   SemanticResolution,
+  SemanticInputObservation,
+  SemanticInputRecord,
+  SemanticModuleResolution,
   SemanticResolveInput,
   SemanticResolver,
   WorkspacePackage,

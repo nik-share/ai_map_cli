@@ -2,6 +2,7 @@ import type ts from "typescript";
 
 import type {
   CodeMap,
+  CompilerUnitRecord,
   DiagnosticRecord,
   FileRecord,
   Framework,
@@ -14,8 +15,10 @@ import type {
 } from "./schemas.js";
 
 export type {
+  ArtifactIntegrityRecord,
   CodeMap,
   CodeMapConfig,
+  CompilerUnitRecord,
   DiagnosticCode,
   DiagnosticRecord,
   DiagnosticSeverity,
@@ -34,11 +37,13 @@ export type {
   ManifestSourceFile,
   MapCounts,
   ProjectRecord,
+  ProducerRecord,
   RelationEvidenceClassification,
   RelationOrigin,
   RelationRecord,
   RelationType,
   SourceRange,
+  SemanticInputRecord,
   SymbolKind,
   SymbolRecord,
   SyntaxSummary,
@@ -105,6 +110,13 @@ export interface SemanticResolveInput {
   root: string;
   sourceFiles: string[];
   tsconfig?: string;
+  /** Stable owning compiler-unit ID. Additive in schema v2; legacy resolvers may ignore it. */
+  compilerUnit?: string;
+}
+
+export interface SemanticModuleResolution {
+  resolvedFileName: string;
+  isExternalLibraryImport: boolean;
 }
 
 export interface SemanticResolution {
@@ -112,7 +124,40 @@ export interface SemanticResolution {
   checker: ts.TypeChecker;
   pathAliases: Record<string, string[]>;
   diagnostics: DiagnosticRecord[];
+  /** Unit-anchored resolution used by analyzers instead of the process-global ts.sys host. */
+  resolveModule?: (
+    moduleName: string,
+    containingFile: string,
+  ) => SemanticModuleResolution | undefined;
+  /** Bounded compiler-consumed files, typed probes, directories, symlinks, and toolchain inputs. */
+  semanticInputs?: () => SemanticInputObservation[];
 }
+
+export type SemanticInputObservation =
+  | { path: string; kind: "file"; hash: string }
+  | {
+      path: string;
+      kind: "resolution-probe";
+      /** Defaults to the selected project for third-party resolver compatibility. */
+      scope?: "project" | "toolchain";
+      targetKind: "file" | "directory" | "readable-file";
+      exists: boolean;
+    }
+  | {
+      path: string;
+      kind: "directory-listing";
+      /** Defaults to the selected project for third-party resolver compatibility. */
+      scope?: "project" | "toolchain";
+      hash: string;
+    }
+  | {
+      path: string;
+      kind: "symlink";
+      /** Defaults to the selected project for third-party resolver compatibility. */
+      scope?: "project" | "toolchain";
+      target: string;
+    }
+  | { path: string; kind: "toolchain-file"; hash: string };
 
 export interface SemanticResolver {
   readonly name: string;
@@ -185,6 +230,9 @@ export interface AnalysisContext {
   packageDependencies: Set<string>;
   syntax: SyntaxParseResult;
   includePrivateSymbols: boolean;
+  compilerUnit?: CompilerUnitRecord;
+  indexedSourcePaths?: ReadonlySet<string>;
+  resolveModule?: SemanticResolution["resolveModule"];
 }
 
 export interface AnalysisContribution {

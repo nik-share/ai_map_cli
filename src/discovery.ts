@@ -5,7 +5,12 @@ import fg from "fast-glob";
 
 import type { CodeMapConfig, Framework, Language, WorkspacePackage } from "./types.js";
 import { packageEntryPoints } from "./package-metadata.js";
-import { isPathInside, normalizeStoredPath, relativePosix } from "./utils/path.js";
+import {
+  isPathInside,
+  normalizeStoredPath,
+  readFileInsideRoot,
+  relativePosix,
+} from "./utils/path.js";
 import { compareText, mapLimit } from "./utils/stable.js";
 import { createWorkspaceDiscovery } from "./workspaces.js";
 import { createGitIgnoreAdapter } from "./ignore.js";
@@ -29,20 +34,36 @@ export interface DiscoveredSource {
 }
 
 export async function readPackageMetadata(root: string): Promise<PackageMetadata> {
-  const raw = JSON.parse(await fs.readFile(path.join(root, "package.json"), "utf8")) as Record<
-    string,
-    unknown
-  >;
+  const raw = JSON.parse(
+    (await readFileInsideRoot(root, path.join(root, "package.json"))).toString("utf8"),
+  ) as Record<string, unknown>;
+  const workspaceDiscovery = await createWorkspaceDiscovery().discover(root);
   const dependencies = new Set<string>();
-  for (const field of [
-    "dependencies",
-    "devDependencies",
-    "peerDependencies",
-    "optionalDependencies",
-  ]) {
-    const values = raw[field];
-    if (values && typeof values === "object") {
-      for (const name of Object.keys(values)) dependencies.add(name);
+  const manifests = [raw];
+  for (const workspace of workspaceDiscovery.packages) {
+    try {
+      manifests.push(
+        JSON.parse(
+          (
+            await readFileInsideRoot(root, path.join(root, workspace.path, "package.json"))
+          ).toString("utf8"),
+        ) as Record<string, unknown>,
+      );
+    } catch {
+      // Workspace discovery already degrades safely; malformed child metadata is non-fatal here.
+    }
+  }
+  for (const manifest of manifests) {
+    for (const field of [
+      "dependencies",
+      "devDependencies",
+      "peerDependencies",
+      "optionalDependencies",
+    ]) {
+      const values = manifest[field];
+      if (values && typeof values === "object") {
+        for (const name of Object.keys(values)) dependencies.add(name);
+      }
     }
   }
 
@@ -52,9 +73,8 @@ export async function readPackageMetadata(root: string): Promise<PackageMetadata
   if (dependencies.has("@nestjs/core") || dependencies.has("@nestjs/common"))
     frameworks.push("nestjs");
 
-  const workspaceDiscovery = await createWorkspaceDiscovery().discover(root);
   return {
-    name: typeof raw.name === "string" ? raw.name : path.basename(root),
+    name: typeof raw.name === "string" ? raw.name : "unnamed-project",
     ...(typeof raw.packageManager === "string" ? { packageManager: raw.packageManager } : {}),
     dependencies,
     frameworks: [...new Set(frameworks)].sort(),
@@ -68,7 +88,14 @@ export async function discoverSourceFiles(
   root: string,
   config: CodeMapConfig,
 ): Promise<DiscoveredSource[]> {
-  const matches = await fg(config.include, {
+  const workspaceDiscovery = await createWorkspaceDiscovery().discover(root);
+  const include = [
+    ...config.include,
+    ...workspaceDiscovery.packages.flatMap((workspace) =>
+      config.include.map((pattern) => prefixGlob(workspace.path, pattern)),
+    ),
+  ];
+  const matches = await fg(include, {
     cwd: root,
     onlyFiles: true,
     unique: true,
@@ -98,6 +125,11 @@ export async function discoverSourceFiles(
     return isPathInside(realRoot, real) ? candidate : undefined;
   });
   return safe.filter((candidate): candidate is DiscoveredSource => candidate !== undefined);
+}
+
+function prefixGlob(directory: string, pattern: string): string {
+  const normalized = normalizeStoredPath(pattern).replace(/^\/+/, "");
+  return `${normalizeStoredPath(directory)}/${normalized}`;
 }
 
 export async function locateTsconfig(

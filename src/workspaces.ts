@@ -5,7 +5,12 @@ import { getPackages } from "@manypkg/get-packages";
 
 import { packageEntryPoints } from "./package-metadata.js";
 import type { WorkspaceDiscovery, WorkspaceDiscoveryResult, WorkspacePackage } from "./types.js";
-import { isPathInside, normalizeStoredPath } from "./utils/path.js";
+import {
+  isPathInside,
+  isSafeRegularFile,
+  normalizeStoredPath,
+  readFileInsideRoot,
+} from "./utils/path.js";
 import { compareText } from "./utils/stable.js";
 
 export class ManypkgWorkspaceDiscovery implements WorkspaceDiscovery {
@@ -29,12 +34,15 @@ export class ManypkgWorkspaceDiscovery implements WorkspaceDiscovery {
       for (const workspace of discovered.packages) {
         const realDirectory = await fs.realpath(workspace.dir);
         if (realDirectory === selectedRoot || !isPathInside(selectedRoot, realDirectory)) continue;
+        const manifestPath = path.join(realDirectory, "package.json");
+        if (!(await isSafeRegularFile(selectedRoot, manifestPath))) continue;
+        const manifest = JSON.parse(
+          (await readFileInsideRoot(selectedRoot, manifestPath)).toString("utf8"),
+        ) as Record<string, unknown>;
         packages.push({
-          name: workspace.packageJson.name,
+          name: typeof manifest.name === "string" ? manifest.name : path.basename(realDirectory),
           path: normalizeStoredPath(path.relative(selectedRoot, realDirectory)),
-          entryPoints: packageEntryPoints(
-            workspace.packageJson as unknown as Record<string, unknown>,
-          ),
+          entryPoints: packageEntryPoints(manifest),
         });
       }
       packages.sort((a, b) => compareText(a.path, b.path));
@@ -52,16 +60,12 @@ export function createWorkspaceDiscovery(): WorkspaceDiscovery {
 
 async function isWorkspaceRoot(root: string): Promise<boolean> {
   for (const marker of ["pnpm-workspace.yaml", "pnpm-workspace.yml", "lerna.json", "rush.json"]) {
-    try {
-      if ((await fs.stat(path.join(root, marker))).isFile()) return true;
-    } catch {
-      // Missing marker files are expected.
-    }
+    if (await isSafeRegularFile(root, path.join(root, marker))) return true;
   }
   try {
-    const packageJson = JSON.parse(await fs.readFile(path.join(root, "package.json"), "utf8")) as {
-      workspaces?: unknown;
-    };
+    const packageJson = JSON.parse(
+      (await readFileInsideRoot(root, path.join(root, "package.json"))).toString("utf8"),
+    ) as { workspaces?: unknown };
     return (
       Array.isArray(packageJson.workspaces) ||
       Boolean(

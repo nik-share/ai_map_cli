@@ -51,9 +51,15 @@ interface ModuleMetadata {
   exports: string[];
 }
 
+const registeredNestJsAnalyzers = new WeakSet();
+
 export class NestJsAnalyzer implements FrameworkAnalyzer {
   readonly name = "nestjs";
   readonly version = "0.1.0-experimental";
+
+  constructor() {
+    registeredNestJsAnalyzers.add(this);
+  }
 
   supports(context: AnalysisContext): boolean {
     if (!context.relativePath.endsWith(".ts")) return false;
@@ -203,6 +209,30 @@ export class NestJsAnalyzer implements FrameworkAnalyzer {
 
     return { symbols, relations, frameworks: ["nestjs"] };
   }
+}
+
+const nestJsSupports = NestJsAnalyzer.prototype.supports.bind(NestJsAnalyzer.prototype);
+const nestJsAnalyze = NestJsAnalyzer.prototype.analyze.bind(NestJsAnalyzer.prototype);
+
+/** Return immutable canonical methods only for an unmodified, directly constructed instance. */
+export function trustedNestJsAnalyzerMethods(analyzer: FrameworkAnalyzer):
+  | {
+      supports(context: AnalysisContext): boolean;
+      analyze(context: AnalysisContext): AnalysisContribution | Promise<AnalysisContribution>;
+    }
+  | undefined {
+  if (!registeredNestJsAnalyzers.has(analyzer)) return undefined;
+  if (Object.getPrototypeOf(analyzer) !== NestJsAnalyzer.prototype) return undefined;
+  if (Object.hasOwn(analyzer, "supports") || Object.hasOwn(analyzer, "analyze")) {
+    return undefined;
+  }
+  const name = Object.getOwnPropertyDescriptor(analyzer, "name");
+  const version = Object.getOwnPropertyDescriptor(analyzer, "version");
+  if (name?.value !== "nestjs" || version?.value !== "0.1.0-experimental") return undefined;
+  return {
+    supports: (context) => nestJsSupports(context),
+    analyze: (context) => nestJsAnalyze(context),
+  };
 }
 
 export default NestJsAnalyzer;

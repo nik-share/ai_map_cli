@@ -1,5 +1,6 @@
 import ts from "typescript";
 
+import { DEFAULT_SYNTAX_PARSER } from "./constants.js";
 import type {
   Language,
   SourceRange,
@@ -11,9 +12,15 @@ import type {
 } from "./types.js";
 import { compareText } from "./utils/stable.js";
 
+const registeredTypeScriptParsers = new WeakSet();
+
 export class TypeScriptParserAdapter implements SyntaxParserAdapter {
   readonly name = "typescript-compiler-syntax";
   readonly version = ts.version;
+
+  constructor() {
+    registeredTypeScriptParsers.add(this);
+  }
 
   supports(language: Language): boolean {
     return ["ts", "tsx", "js", "jsx", "mts", "cts", "mjs", "cjs"].includes(language);
@@ -103,6 +110,19 @@ export class FallbackParserAdapter implements SyntaxParserAdapter {
 
 export function createTypeScriptParserAdapter(): SyntaxParserAdapter {
   return new TypeScriptParserAdapter();
+}
+
+export function isBuiltInTypeScriptParserAdapter(
+  parser: SyntaxParserAdapter,
+): parser is TypeScriptParserAdapter {
+  // The registration check is intentionally first: a Proxy around a genuine instance is a
+  // different object and cannot spoof provenance through alternating property reads.
+  if (!registeredTypeScriptParsers.has(parser)) return false;
+  if (Object.getPrototypeOf(parser) !== TypeScriptParserAdapter.prototype) return false;
+  if (Object.hasOwn(parser, "supports") || Object.hasOwn(parser, "parse")) return false;
+  const name = Object.getOwnPropertyDescriptor(parser, "name");
+  const version = Object.getOwnPropertyDescriptor(parser, "version");
+  return name?.value === DEFAULT_SYNTAX_PARSER && version?.value === ts.version;
 }
 
 function visitSyntax(

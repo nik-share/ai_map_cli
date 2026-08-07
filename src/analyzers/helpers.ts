@@ -9,6 +9,7 @@ import type {
   SymbolKind,
   SymbolRecord,
 } from "../types.js";
+import { redactAbsolutePathsInText } from "../utils/path.js";
 
 export function nodeRange(sourceFile: ts.SourceFile, node: ts.Node): SourceRange {
   const start = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile, false));
@@ -126,7 +127,7 @@ export function getSignature(context: AnalysisContext, node: ts.Node): string | 
   return undefined;
 }
 
-function redactStringLiterals(value: string): string {
+export function redactStringLiterals(value: string): string {
   return value.replace(/(["'])(?:\\.|(?!\1)[^\\\r\n])*\1/g, '"<literal>"');
 }
 
@@ -150,6 +151,10 @@ export function makeSymbol(
   const documentation = options.documentation;
   const signature =
     options.signature ?? (ts.isSourceFile(node) ? undefined : getSignature(context, node));
+  const safeSignature = signature ? redactAbsolutePathsInText(signature, context.root) : undefined;
+  const safeDocumentation = documentation
+    ? redactAbsolutePathsInText(documentation, context.root)
+    : undefined;
   return {
     schemaVersion: SCHEMA_VERSION,
     id: symbolId(kind, context.relativePath, name, options.parent),
@@ -161,8 +166,8 @@ export function makeSymbol(
     ...((options.defaultExport ?? (!ts.isSourceFile(node) && hasDefaultModifier(node)))
       ? { defaultExport: true }
       : {}),
-    ...(signature ? { signature: compactText(signature) } : {}),
-    ...(documentation ? { documentation: compactText(documentation) } : {}),
+    ...(safeSignature ? { signature: compactText(safeSignature) } : {}),
+    ...(safeDocumentation ? { documentation: compactText(safeDocumentation) } : {}),
     facts: options.facts ?? {},
     sourceHash: context.sourceHash,
   };

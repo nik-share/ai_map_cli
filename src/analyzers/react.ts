@@ -2,7 +2,7 @@ import path from "node:path";
 
 import ts from "typescript";
 
-import { SCHEMA_VERSION } from "../constants.js";
+import { ANALYZER_VERSION, SCHEMA_VERSION } from "../constants.js";
 import { symbolId } from "../ids.js";
 import type {
   AnalysisContribution,
@@ -10,6 +10,7 @@ import type {
   FrameworkAnalyzer,
   RelationRecord,
 } from "../types.js";
+import { isPathInside, relativePosix } from "../utils/path.js";
 import {
   compactText,
   hasDefaultModifier,
@@ -18,6 +19,7 @@ import {
   nodeLine,
   nodeRange,
   propertyNameText,
+  redactStringLiterals,
 } from "./helpers.js";
 
 const REACT_EXTENSIONS = new Set([".ts", ".tsx", ".js", ".jsx"]);
@@ -35,7 +37,7 @@ const REACT_FACTORYS = new Set(["memo", "forwardRef"]);
 interface ImportProfile {
   hookAliases: Map<string, string>;
   namespaceAliases: Set<string>;
-  localImports: Map<string, string>;
+  localImports: Map<string, { source: string; imported: string }>;
 }
 
 interface ComponentDescriptor {
@@ -51,7 +53,7 @@ interface NamedSyntaxCandidate {
 
 export class ReactAnalyzer implements FrameworkAnalyzer {
   readonly name = "react";
-  readonly version = "0.1.0";
+  readonly version = ANALYZER_VERSION;
 
   supports(context: AnalysisContext): boolean {
     const extension = path.extname(context.relativePath).toLowerCase();
@@ -190,6 +192,7 @@ export class ReactAnalyzer implements FrameworkAnalyzer {
       for (const candidate of rendered) {
         const to =
           componentIds.get(candidate.name.toLowerCase()) ??
+          resolveReactCandidateWithChecker(context, candidate, "react-component") ??
           resolveImportedReactComponent(context, profile, candidate.name) ??
           symbolId("react-component", context.relativePath, candidate.name);
         relations.push(
@@ -200,6 +203,7 @@ export class ReactAnalyzer implements FrameworkAnalyzer {
       for (const candidate of collectCalledCustomHooks(component.body, profile)) {
         const to =
           hookIds.get(candidate.name.toLowerCase()) ??
+          resolveReactCandidateWithChecker(context, candidate, "react-hook") ??
           resolveImportedReactSymbol(context, profile, candidate.name, "react-hook") ??
           symbolId("react-hook", context.relativePath, candidate.name);
         relations.push(
@@ -271,7 +275,7 @@ function isNameExported(sourceFile: ts.SourceFile, node: ts.Node): boolean {
 function collectImportProfile(sourceFile: ts.SourceFile): ImportProfile {
   const hookAliases = new Map<string, string>();
   const namespaceAliases = new Set<string>();
-  const localImports = new Map<string, string>();
+  const localImports = new Map<string, { source: string; imported: string }>();
 
   for (const statement of sourceFile.statements) {
     if (!ts.isImportDeclaration(statement) || !ts.isStringLiteral(statement.moduleSpecifier))
@@ -283,6 +287,7 @@ function collectImportProfile(sourceFile: ts.SourceFile): ImportProfile {
     if (source === "react") {
       if (clause.name) {
         hookAliases.set(clause.name.text, clause.name.text);
+        localImports.set(clause.name.text, { source, imported: "default" });
       }
       if (!clause.namedBindings) continue;
       if (ts.isNamespaceImport(clause.namedBindings)) {
@@ -293,20 +298,27 @@ function collectImportProfile(sourceFile: ts.SourceFile): ImportProfile {
         const local = item.name.text;
         const imported = item.propertyName?.text ?? item.name.text;
         hookAliases.set(local, imported);
+        localImports.set(local, { source, imported });
       }
       continue;
     }
 
-    if (source.startsWith("./") || source.startsWith("../")) {
-      if (!clause.namedBindings) continue;
-      if (ts.isNamedImports(clause.namedBindings)) {
-        for (const item of clause.namedBindings.elements) {
-          localImports.set(item.name.text, source);
-        }
-      } else if (ts.isNamespaceImport(clause.namedBindings)) {
-        localImports.set(clause.namedBindings.name.text, source);
+    if (clause.name) {
+      localImports.set(clause.name.text, { source, imported: "default" });
+    }
+    if (!clause.namedBindings) continue;
+    if (ts.isNamedImports(clause.namedBindings)) {
+      for (const item of clause.namedBindings.elements) {
+        localImports.set(item.name.text, {
+          source,
+          imported: item.propertyName?.text ?? item.name.text,
+        });
       }
-      continue;
+    } else if (ts.isNamespaceImport(clause.namedBindings)) {
+      localImports.set(clause.namedBindings.name.text, {
+        source,
+        imported: "*",
+      });
     }
   }
 
@@ -461,7 +473,7 @@ function collectComponentBehavior(
 
     if (called === "useEffect" || called === "useLayoutEffect") {
       const deps = node.arguments[1]
-        ? compactText(node.arguments[1].getText(context.sourceFile))
+        ? compactText(redactStringLiterals(node.arguments[1].getText(context.sourceFile)))
         : "[]";
       effects.push(`useeffect:${deps}`);
       return;
@@ -481,29 +493,28 @@ function collectComponentBehavior(
 }
 
 function collectCalledCustomHooks(node: ts.Node, profile: ImportProfile): NamedSyntaxCandidate[] {
-  const hooks = new Map<string, NamedSyntaxCandidate>();
+  const hooks: NamedSyntaxCandidate[] = [];
   visit(node, (current) => {
     if (!ts.isCallExpression(current)) return;
     const called = resolveCallName(current.expression, profile);
     if (called && called.startsWith("use") && !REACT_BUILTIN_HOOKS.has(called)) {
-      const key = called.toLowerCase();
-      if (!hooks.has(key)) hooks.set(key, { name: called, node: current });
+      hooks.push({ name: called, node: current });
     }
   });
-  return [...hooks.values()];
+  return hooks;
 }
 
 function collectRenderedComponents(node: ts.Node): NamedSyntaxCandidate[] {
-  const components = new Map<string, NamedSyntaxCandidate>();
+  const components: NamedSyntaxCandidate[] = [];
   visit(node, (current) => {
     if (!ts.isJsxElement(current) && !ts.isJsxSelfClosingElement(current)) return;
     const evidenceNode = ts.isJsxElement(current) ? current.openingElement : current;
     const tag = jsxTagName(evidenceNode.tagName);
-    if (tag && isUpperCase(tag) && !components.has(tag.toLowerCase())) {
-      components.set(tag.toLowerCase(), { name: tag, node: evidenceNode });
+    if (tag && isUpperCase(tag)) {
+      components.push({ name: tag, node: evidenceNode });
     }
   });
-  return [...components.values()];
+  return components;
 }
 
 function resolveImportedReactComponent(
@@ -514,6 +525,50 @@ function resolveImportedReactComponent(
   return resolveImportedReactSymbol(context, profile, renderedName, "react-component");
 }
 
+function resolveReactCandidateWithChecker(
+  context: AnalysisContext,
+  candidate: NamedSyntaxCandidate,
+  kind: "react-component" | "react-hook",
+): string | undefined {
+  let location: ts.Node = candidate.node;
+  if (ts.isJsxOpeningElement(candidate.node) || ts.isJsxSelfClosingElement(candidate.node)) {
+    location = candidate.node.tagName;
+  } else if (ts.isCallExpression(candidate.node)) {
+    location = candidate.node.expression;
+  }
+  let symbol = context.checker.getSymbolAtLocation(location);
+  if (!symbol && ts.isPropertyAccessExpression(location)) {
+    symbol = context.checker.getSymbolAtLocation(location.name);
+  }
+  if (!symbol) return undefined;
+  if (symbol.flags & ts.SymbolFlags.Alias) {
+    try {
+      symbol = context.checker.getAliasedSymbol(symbol);
+    } catch {
+      return undefined;
+    }
+  }
+  const declaration = symbol.valueDeclaration ?? symbol.declarations?.[0];
+  if (!declaration) return undefined;
+  const sourceFile = declaration.getSourceFile();
+  let relative: string;
+  try {
+    relative = path.relative(context.root, sourceFile.fileName).split(path.sep).join("/");
+  } catch {
+    return undefined;
+  }
+  if (
+    relative === "" ||
+    relative === ".." ||
+    relative.startsWith("../") ||
+    path.isAbsolute(relative) ||
+    (context.indexedSourcePaths && !context.indexedSourcePaths.has(relative))
+  ) {
+    return undefined;
+  }
+  return symbolId(kind, relative, declarationToSymbolName(declaration) ?? symbol.getName());
+}
+
 function resolveImportedReactSymbol(
   context: AnalysisContext,
   profile: ImportProfile,
@@ -522,8 +577,22 @@ function resolveImportedReactSymbol(
 ): string | undefined {
   const source = profile.localImports.get(importedName);
   if (!source) return undefined;
+  if (!source.source.startsWith("./") && !source.source.startsWith("../")) {
+    const resolved = context.resolveModule?.(source.source, context.sourceFile.fileName);
+    if (!resolved) return undefined;
+    if (!isPathInside(context.root, resolved.resolvedFileName)) return undefined;
+    const relative = relativePosix(context.root, resolved.resolvedFileName);
+    if (context.indexedSourcePaths && !context.indexedSourcePaths.has(relative)) return undefined;
+    const sourceFile = context.program.getSourceFile(resolved.resolvedFileName);
+    const declaration = sourceFile
+      ? findExportedDeclaration(sourceFile, source.imported)
+      : undefined;
+    const actualName = declaration ? declarationToSymbolName(declaration) : undefined;
+    if (actualName) return symbolId(kind, relative, actualName);
+    return symbolId(kind, relative, source.imported);
+  }
   const relative = path.posix.normalize(
-    path.join(path.posix.dirname(context.relativePath), source),
+    path.posix.join(path.posix.dirname(context.relativePath), source.source),
   );
   const candidates = [
     relative,
@@ -531,21 +600,133 @@ function resolveImportedReactSymbol(
     `${relative}.tsx`,
     `${relative}.js`,
     `${relative}.jsx`,
+    `${relative}.mjs`,
+    `${relative}.cjs`,
     `${relative}/index.ts`,
     `${relative}/index.tsx`,
+    `${relative}/index.jsx`,
   ];
   for (const candidate of candidates) {
     const absolute = path.resolve(context.root, candidate);
-    if (context.program.getSourceFile(absolute)) {
-      return symbolId(kind, candidate, importedName);
+    const imported = context.program.getSourceFile(absolute);
+    if (imported) {
+      const declaration = findExportedDeclaration(imported, source.imported);
+      if (declaration) {
+        const symbolName = declarationToSymbolName(declaration);
+        if (symbolName) return symbolId(kind, candidate, symbolName);
+      }
+      if (source.imported !== "*") return symbolId(kind, candidate, source.imported);
     }
   }
-  return symbolId(kind, relative, importedName);
+  const fallback = source.imported === "*" ? importedName : source.imported;
+  return symbolId(kind, relative, fallback);
+}
+
+function declarationToSymbolName(declaration: ts.Declaration): string | undefined {
+  if (ts.isFunctionDeclaration(declaration)) return declaration.name?.text ?? "default";
+  if (ts.isClassDeclaration(declaration)) return declaration.name?.text ?? "default";
+  if (ts.isInterfaceDeclaration(declaration) || ts.isTypeAliasDeclaration(declaration))
+    return declaration.name.text;
+  if (ts.isVariableDeclaration(declaration) && ts.isIdentifier(declaration.name))
+    return declaration.name.text;
+  return "default";
+}
+
+function findExportedDeclaration(
+  sourceFile: ts.SourceFile,
+  exportedName: string,
+): ts.Declaration | undefined {
+  for (const statement of sourceFile.statements) {
+    if (
+      ts.isFunctionDeclaration(statement) &&
+      ((exportedName === "default" && hasDefaultModifier(statement)) ||
+        statement.name?.text === exportedName)
+    )
+      return statement;
+    if (
+      ts.isClassDeclaration(statement) &&
+      ((exportedName === "default" && hasDefaultModifier(statement)) ||
+        statement.name?.text === exportedName)
+    )
+      return statement;
+    if (
+      ts.isInterfaceDeclaration(statement) &&
+      ((exportedName === "default" && hasDefaultModifier(statement)) ||
+        statement.name.text === exportedName)
+    )
+      return statement;
+    if (
+      ts.isTypeAliasDeclaration(statement) &&
+      ((exportedName === "default" && hasDefaultModifier(statement)) ||
+        statement.name.text === exportedName)
+    )
+      return statement;
+    if (ts.isVariableStatement(statement)) {
+      const declaration =
+        exportedName === "default"
+          ? statement.declarationList.declarations.find(
+              (item) => hasDefaultModifier(statement) && ts.isIdentifier(item.name),
+            )
+          : statement.declarationList.declarations.find(
+              (item) => ts.isIdentifier(item.name) && item.name.text === exportedName,
+            );
+      if (declaration && ts.isIdentifier(declaration.name)) return declaration;
+    }
+    if (
+      ts.isExportDeclaration(statement) &&
+      statement.exportClause &&
+      ts.isNamedExports(statement.exportClause)
+    ) {
+      const specifier = statement.exportClause.elements.find(
+        (item) =>
+          item.name.text === exportedName ||
+          (item.name.text === "default" && item.propertyName?.text === exportedName),
+      );
+      if (!specifier) continue;
+      return findExportedDeclaration(
+        sourceFile,
+        specifier.propertyName?.text ?? specifier.name.text,
+      );
+    }
+    if (
+      ts.isExportAssignment(statement) &&
+      !statement.isExportEquals &&
+      ts.isIdentifier(statement.expression)
+    ) {
+      return findDeclarationByName(sourceFile, statement.expression.text);
+    }
+  }
+  return undefined;
+}
+
+function findDeclarationByName(
+  sourceFile: ts.SourceFile,
+  name: string,
+): ts.Declaration | undefined {
+  for (const statement of sourceFile.statements) {
+    if (
+      ts.isFunctionDeclaration(statement) ||
+      ts.isClassDeclaration(statement) ||
+      ts.isInterfaceDeclaration(statement) ||
+      ts.isTypeAliasDeclaration(statement)
+    ) {
+      if (statement.name?.text === name) return statement;
+    }
+    if (ts.isVariableStatement(statement)) {
+      const declaration = statement.declarationList.declarations.find(
+        (item) => ts.isIdentifier(item.name) && item.name.text === name,
+      );
+      if (declaration) return declaration;
+    }
+  }
+  return undefined;
 }
 
 function dependencyText(expression: ts.Expression | undefined, sourceFile: ts.SourceFile): string {
   if (!expression || !ts.isArrayLiteralExpression(expression)) return "[]";
-  return expression.elements.map((element) => compactText(element.getText(sourceFile))).join(",");
+  return expression.elements
+    .map((element) => compactText(redactStringLiterals(element.getText(sourceFile))))
+    .join(",");
 }
 
 function resolveCallName(

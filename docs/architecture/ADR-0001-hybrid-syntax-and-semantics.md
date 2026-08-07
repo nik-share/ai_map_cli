@@ -29,6 +29,33 @@ For the alpha production path, the TypeScript `Program` supplies both its reusab
 
 Tree-sitter is therefore **deferred as a default production pass**. The public adapter and normalized IR are in place; the compiler-only path remains the safe fallback and default.
 
+### Milestone 1 and 1.1 closure updates
+
+- Persisted schema is now `v4`; v3 added semantic-input closure, producer provenance, companion
+  integrity hashes, and collision-safe unit IDs, while v4 adds redundant per-source compiler
+  ownership and line counts for direct-load integrity. Existing maps require a rescan.
+- A bounded config walk now discovers and fingerprints `tsconfig`/`jsconfig` candidates and resolves transitive `extends` and `references`; workspace/config manifests participate in ownership and freshness.
+- Ownership is assigned only via parsed `fileNames` and chooses the deepest validated boundary in priority order:
+  - deepest shared validated workspace/package boundary,
+  - deepest config directory ancestor,
+  - lexical normalized config path fallback.
+- One compiler `Program` is built per non-empty owning compiler unit. Programs are processed sequentially and only owned files are analyzed/persisted; zero-owned solution nodes remain graph metadata, and unit facts are merged after normalizing root-relative paths.
+- File ownership is enforced by a single compiler unit per scanned file, with exactly one `fallback` unit when no configured owner exists.
+- The source import graph is resolved in-module during scan. Direct referenced packages use parsed project references plus static package metadata to resolve back to in-root source when an emitted `.d.ts` target is absent.
+- TypeScript remains the semantic authority; Tree-sitter/ast-grep remains development-only for now.
+- `manifest.configHash` includes normalized scanner semantics, ownership/config graph inputs, and versioned tool/parser/analyzer/TS/schema vectors. A separate deterministic closure records additional in-root files TypeScript consumed plus typed resolution probes, directory listings, symlink mappings, and raw-byte file hashes scoped to the selected project or active TypeScript library root.
+- A current default scan reuses the complete persisted map only after every companion's raw bytes match the manifest integrity index and all schemas/cross-record invariants validate. Stale semantic inputs, invalid/missing companions, or custom analysis components use the full compiler path.
+- Initial and freshness source identities are SHA-256 over identical raw bytes; UTF-8 decoding is analysis input only.
+- External call identities use import provenance where it is provable (`external:react#useState`); unknown module provenance remains explicit and heuristic (`external:unresolved#...`).
+- Generated and configured compiler-unit IDs have disjoint structural prefixes. Persisted paths are repository-relative POSIX values, with cross-platform absolute import text redacted at the persistence boundary.
+
+Compatibility notes:
+
+- `ProjectRecord.tsconfig` and `ProjectRecord.pathAliases` are retained as compatibility projections.
+- `CompilerUnitRecord.pathAliases` is authoritative for unit analysis.
+- Bounded host/type/module resolution avoids caller working-directory dependence.
+- The manifest integrity index is a deterministic corruption/tamper signal, not a cryptographic signature over an untrusted producer.
+
 ## Fact ownership
 
 | Layer                                    | Responsibility                                                                                                                                          | Authority label                                              |

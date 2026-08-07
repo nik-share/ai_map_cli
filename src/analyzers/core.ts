@@ -3,7 +3,7 @@ import path from "node:path";
 
 import ts from "typescript";
 
-import { SCHEMA_VERSION } from "../constants.js";
+import { ANALYZER_VERSION, SCHEMA_VERSION } from "../constants.js";
 import { externalId, fileId, symbolId } from "../ids.js";
 import type {
   AnalysisContext,
@@ -18,7 +18,7 @@ import type {
   SymbolKind,
   SymbolRecord,
 } from "../types.js";
-import { isPathInside, relativePosix } from "../utils/path.js";
+import { isPathInside, relativePosix, sanitizeModuleSpecifier } from "../utils/path.js";
 import { compareText } from "../utils/stable.js";
 import {
   getDeclarationName,
@@ -34,7 +34,7 @@ import {
 
 export class CoreAnalyzer implements FrameworkAnalyzer {
   readonly name = "typescript-node";
-  readonly version = "0.1.0";
+  readonly version = ANALYZER_VERSION;
 
   supports(): boolean {
     return true;
@@ -329,9 +329,16 @@ function resolveExpressionTarget(
   if (!symbol && ts.isPropertyAccessExpression(expression)) {
     symbol = context.checker.getSymbolAtLocation(expression.name);
   }
+  const externalBinding = importedExpressionBinding(context, expression);
   if (!symbol) {
     const imported = resolveImportedExpressionTarget(context, expression);
     if (imported) return { id: imported, exact: true };
+    if (externalBinding) {
+      return {
+        id: externalId(externalBinding.module, externalBinding.exported),
+        exact: true,
+      };
+    }
     const fallback = allowFallback ? expressionFallbackId(expression) : undefined;
     return fallback ? { id: fallback, exact: false } : undefined;
   }
@@ -346,33 +353,66 @@ function resolveExpressionTarget(
   if (!declaration) {
     const imported = resolveImportedExpressionTarget(context, expression);
     if (imported) return { id: imported, exact: true };
+    if (externalBinding) {
+      return {
+        id: externalId(externalBinding.module, externalBinding.exported),
+        exact: true,
+      };
+    }
     const fallback = allowFallback ? expressionFallbackId(expression) : undefined;
     return fallback ? { id: fallback, exact: false } : undefined;
   }
   const source = declaration.getSourceFile();
   if (!isPathInside(context.root, source.fileName)) {
-    return { id: externalId(inferExternalModule(expression), symbol.getName()), exact: true };
+    return externalBinding
+      ? {
+          id: externalId(externalBinding.module, externalBinding.exported),
+          exact: true,
+        }
+      : allowFallback
+        ? { id: externalId("unresolved", symbol.getName()), exact: false }
+        : undefined;
   }
   const relative = relativePosix(context.root, source.fileName);
+  if (context.indexedSourcePaths && !context.indexedSourcePaths.has(relative)) {
+    return externalBinding
+      ? {
+          id: externalId(externalBinding.module, externalBinding.exported),
+          exact: true,
+        }
+      : allowFallback
+        ? { id: externalId("unresolved", symbol.getName()), exact: false }
+        : undefined;
+  }
   const id = declarationToId(declaration, relative);
-  return id ? { id, exact: true } : undefined;
+  if (id) return { id, exact: true };
+  if (externalBinding) {
+    return {
+      id: externalId(externalBinding.module, externalBinding.exported),
+      exact: true,
+    };
+  }
+  const fallback = allowFallback ? expressionFallbackId(expression) : undefined;
+  return fallback ? { id: fallback, exact: false } : undefined;
 }
 
 function resolveImportedExpressionTarget(
   context: AnalysisContext,
   expression: ts.Expression,
 ): string | undefined {
-  if (!ts.isIdentifier(expression)) return undefined;
-  for (const imported of context.file.imports) {
-    if (!imported.resolved) continue;
-    const specifier = imported.specifiers.find((item) => item.local === expression.text);
-    if (!specifier) continue;
-    const sourceFile = context.program.getSourceFile(path.resolve(context.root, imported.resolved));
-    if (!sourceFile) continue;
-    const declaration = findExportedDeclaration(sourceFile, specifier.imported);
-    if (declaration) return declarationToId(declaration, imported.resolved);
+  const binding = importedExpressionBinding(context, expression, true);
+  if (!binding?.resolved) return undefined;
+  if (ts.isIdentifier(expression)) {
+    const sourceFile = context.program.getSourceFile(path.resolve(context.root, binding.resolved));
+    if (!sourceFile) return undefined;
+    const declaration = findExportedDeclaration(sourceFile, binding.imported);
+    return declaration ? declarationToId(declaration, binding.resolved) : undefined;
   }
-  return undefined;
+  if (!ts.isPropertyAccessExpression(expression)) return undefined;
+  const sourceFile = context.program.getSourceFile(path.resolve(context.root, binding.resolved));
+  if (!sourceFile) return undefined;
+  const declaration = findExportedDeclaration(sourceFile, expression.name.text);
+  return declaration ? declarationToId(declaration, binding.resolved) : undefined;
 }
 
 function findExportedDeclaration(
@@ -397,6 +437,19 @@ function findExportedDeclaration(
       if (declaration) return declaration;
     }
     if (
+      ts.isExportAssignment(statement) &&
+      !statement.isExportEquals &&
+      ts.isIdentifier(statement.expression)
+    ) {
+      if (exportedName === "default") {
+        const declaration = findDeclarationByName(sourceFile, statement.expression.text);
+        if (declaration) return declaration;
+      }
+      if (statement.expression.text === exportedName) {
+        return findDeclarationByName(sourceFile, statement.expression.text);
+      }
+    }
+    if (
       ts.isExportDeclaration(statement) &&
       statement.exportClause &&
       ts.isNamedExports(statement.exportClause)
@@ -411,6 +464,88 @@ function findExportedDeclaration(
         );
       }
     }
+  }
+  return undefined;
+}
+
+function findDeclarationByName(
+  sourceFile: ts.SourceFile,
+  name: string,
+): ts.Declaration | undefined {
+  for (const statement of sourceFile.statements) {
+    if (
+      (ts.isFunctionDeclaration(statement) ||
+        ts.isClassDeclaration(statement) ||
+        ts.isInterfaceDeclaration(statement) ||
+        ts.isTypeAliasDeclaration(statement)) &&
+      statement.name?.text === name
+    ) {
+      return statement;
+    }
+    if (ts.isVariableStatement(statement)) {
+      const declaration = statement.declarationList.declarations.find(
+        (item) => ts.isIdentifier(item.name) && item.name.text === name,
+      );
+      if (declaration) return declaration;
+    }
+  }
+  return undefined;
+}
+
+interface ImportedExpressionBinding {
+  module: string;
+  exported: string;
+  imported: string;
+  resolved?: string;
+}
+
+function importedExpressionBinding(
+  context: AnalysisContext,
+  expression: ts.Expression,
+  includeLocal = false,
+): ImportedExpressionBinding | undefined {
+  const root = leftMostIdentifierNode(expression);
+  if (!root) return undefined;
+  const rootSymbol = context.checker.getSymbolAtLocation(root);
+  if (!rootSymbol) return undefined;
+  const declaration = rootSymbol.declarations?.find(isImportBindingDeclaration);
+  if (!declaration) return undefined;
+  const importDeclaration = enclosingImportDeclaration(declaration);
+  if (!importDeclaration || !ts.isStringLiteral(importDeclaration.moduleSpecifier))
+    return undefined;
+  const source = sanitizeModuleSpecifier(importDeclaration.moduleSpecifier.text);
+  const line = nodeLine(context.sourceFile, importDeclaration);
+  const imported = context.file.imports.find(
+    (record) =>
+      record.kind === "esm" &&
+      record.source === source &&
+      record.line === line &&
+      record.specifiers.some((specifier) => specifier.local === root.text),
+  );
+  if (!imported || (!includeLocal && !imported.external)) return undefined;
+  const specifier = imported.specifiers.find((item) => item.local === root.text);
+  if (!specifier) return undefined;
+  return {
+    module: imported.source,
+    exported: ts.isPropertyAccessExpression(expression) ? expression.name.text : specifier.imported,
+    imported: specifier.imported,
+    ...(imported.resolved ? { resolved: imported.resolved } : {}),
+  };
+}
+
+function isImportBindingDeclaration(declaration: ts.Declaration): boolean {
+  return (
+    ts.isImportSpecifier(declaration) ||
+    ts.isImportClause(declaration) ||
+    ts.isNamespaceImport(declaration)
+  );
+}
+
+function enclosingImportDeclaration(declaration: ts.Declaration): ts.ImportDeclaration | undefined {
+  let current: ts.Node = declaration;
+  while (!ts.isSourceFile(current)) {
+    if (ts.isImportDeclaration(current)) return current;
+    current = current.parent;
   }
   return undefined;
 }
@@ -475,23 +610,15 @@ function isReferenceIdentifier(node: ts.Identifier): boolean {
 function expressionFallbackId(expression: ts.Expression): string | undefined {
   if (ts.isIdentifier(expression)) return externalId("unresolved", expression.text);
   if (ts.isPropertyAccessExpression(expression)) {
-    return externalId(inferExternalModule(expression), expression.name.text);
+    return externalId("unresolved", expression.name.text);
   }
   return undefined;
 }
 
-function inferExternalModule(expression: ts.Expression): string {
-  if (ts.isPropertyAccessExpression(expression)) {
-    const root = leftMostIdentifier(expression);
-    return root ?? "unresolved";
-  }
-  return ts.isIdentifier(expression) ? expression.text : "unresolved";
-}
-
-function leftMostIdentifier(expression: ts.Expression): string | undefined {
+function leftMostIdentifierNode(expression: ts.Expression): ts.Identifier | undefined {
   let current = expression;
   while (ts.isPropertyAccessExpression(current)) current = current.expression;
-  return ts.isIdentifier(current) ? current.text : undefined;
+  return ts.isIdentifier(current) ? current : undefined;
 }
 
 export function extractFileStructure(context: AnalysisContext): Pick<
@@ -511,10 +638,11 @@ export function extractFileStructure(context: AnalysisContext): Pick<
 
   for (const statement of context.sourceFile.statements) {
     if (ts.isImportDeclaration(statement) && ts.isStringLiteral(statement.moduleSpecifier)) {
-      const source = statement.moduleSpecifier.text;
+      const rawSource = statement.moduleSpecifier.text;
+      const source = sanitizeModuleSpecifier(rawSource);
       const specifiers = importSpecifiers(statement);
       for (const specifier of specifiers) importedModules.set(specifier.local, source);
-      const resolved = resolveImport(context, source);
+      const resolved = resolveImport(context, rawSource);
       imports.push({
         source,
         specifiers,
@@ -524,7 +652,7 @@ export function extractFileStructure(context: AnalysisContext): Pick<
         line: nodeLine(context.sourceFile, statement),
       });
       addImportRelation(context, relations, statement, source, resolved);
-      if (!resolved.found && !isBuiltin(source))
+      if (!resolved.found && !isBuiltin(rawSource))
         diagnostics.push(unresolvedImport(context, statement, source));
     } else if (ts.isExportDeclaration(statement)) {
       extractExportDeclaration(context, statement, exports, relations);
@@ -542,8 +670,9 @@ export function extractFileStructure(context: AnalysisContext): Pick<
     if (ts.isCallExpression(node) && isRequireCall(node)) {
       const argument = node.arguments[0];
       if (!argument || !ts.isStringLiteral(argument)) return;
-      const source = argument.text;
-      const resolved = resolveImport(context, source);
+      const rawSource = argument.text;
+      const source = sanitizeModuleSpecifier(rawSource);
+      const resolved = resolveImport(context, rawSource);
       imports.push({
         source,
         specifiers: [],
@@ -553,7 +682,7 @@ export function extractFileStructure(context: AnalysisContext): Pick<
         line: nodeLine(context.sourceFile, node),
       });
       addImportRelation(context, relations, node, source, resolved);
-      if (!resolved.found && !isBuiltin(source))
+      if (!resolved.found && !isBuiltin(rawSource))
         diagnostics.push(unresolvedImport(context, node, source));
     }
     const envName = processEnvName(node);
@@ -592,7 +721,7 @@ function importSpecifiers(statement: ts.ImportDeclaration): ImportRecord["specif
       local: bindings.name.text,
       ...(clauseTypeOnly ? { typeOnly: true } : {}),
     });
-  } else if (bindings) {
+  } else if (bindings && ts.isNamedImports(bindings)) {
     for (const element of bindings.elements) {
       output.push({
         imported: element.propertyName?.text ?? element.name.text,
@@ -610,10 +739,11 @@ function extractExportDeclaration(
   exports: ExportRecord[],
   relations: RelationRecord[],
 ): void {
-  const source =
+  const rawSource =
     statement.moduleSpecifier && ts.isStringLiteral(statement.moduleSpecifier)
       ? statement.moduleSpecifier.text
       : undefined;
+  const source = rawSource ? sanitizeModuleSpecifier(rawSource) : undefined;
   const line = nodeLine(context.sourceFile, statement);
   if (!statement.exportClause) {
     exports.push({ name: "*", ...(source ? { source } : {}), default: false, line });
@@ -636,8 +766,8 @@ function extractExportDeclaration(
       });
     }
   }
-  if (source) {
-    const resolved = resolveImport(context, source);
+  if (rawSource && source) {
+    const resolved = resolveImport(context, rawSource);
     relations.push(
       relation(
         fileId(context.relativePath),
@@ -697,23 +827,20 @@ interface ImportResolution {
 function resolveImport(context: AnalysisContext, moduleName: string): ImportResolution {
   if (isBuiltin(moduleName) || moduleName.startsWith("node:"))
     return { found: true, external: true };
-  const resolution = ts.resolveModuleName(
-    moduleName,
-    context.sourceFile.fileName,
-    context.program.getCompilerOptions(),
-    ts.sys,
-  ).resolvedModule;
+  const resolution = context.resolveModule?.(moduleName, context.sourceFile.fileName);
   if (!resolution) return { found: false, external: !moduleName.startsWith(".") };
-  if (
-    !isPathInside(context.root, resolution.resolvedFileName) ||
-    resolution.isExternalLibraryImport
-  ) {
+  if (resolution.isExternalLibraryImport) return { found: true, external: true };
+  if (!isPathInside(context.root, resolution.resolvedFileName)) {
     return { found: true, external: true };
+  }
+  const relative = relativePosix(context.root, resolution.resolvedFileName);
+  if (context.indexedSourcePaths && !context.indexedSourcePaths.has(relative)) {
+    return { found: false, external: false };
   }
   return {
     found: true,
     external: false,
-    path: relativePosix(context.root, resolution.resolvedFileName),
+    path: relative,
   };
 }
 
@@ -787,7 +914,7 @@ function externalOperation(
     root = node.expression.text;
     api = root;
   } else if (ts.isPropertyAccessExpression(node.expression)) {
-    root = leftMostIdentifier(node.expression);
+    root = leftMostIdentifierNode(node.expression)?.text;
     api = node.expression.getText(sourceFile);
   } else return undefined;
   const source = root ? importedModules.get(root) : undefined;

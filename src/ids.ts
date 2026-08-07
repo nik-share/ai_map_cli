@@ -1,5 +1,5 @@
 import type { SymbolKind } from "./types.js";
-import { normalizeStoredPath } from "./utils/path.js";
+import { normalizeStoredPath, sanitizeModuleSpecifier } from "./utils/path.js";
 
 export function fileId(filePath: string): string {
   return `file:${normalizeStoredPath(filePath)}`;
@@ -17,7 +17,15 @@ export function symbolId(
 }
 
 export function externalId(moduleName: string, name = "default"): string {
-  return `external:${moduleName}#${name}`;
+  return `external:${sanitizeModuleSpecifier(moduleName)}#${name}`;
+}
+
+export function configuredCompilerUnitId(configPath: string): string {
+  return `compiler-unit:configured:${normalizeStoredPath(configPath)}`;
+}
+
+export function generatedCompilerUnitId(name: string): string {
+  return `compiler-unit:generated:${normalizeStoredPath(name)}`;
 }
 
 export function routeId(method: string, route: string): string {

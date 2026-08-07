@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "root": "../..",
+  "include": [
+    "**/*.ts",
+    "**/*.tsx",
+    "**/*.js",
+    "**/*.jsx",
+    "**/*.mts",
+    "**/*.cts",
+    "**/*.mjs",
+    "**/*.cjs"
+  ],
+  "exclude": [
+    "**/node_modules/**",
+    "**/.next/**",
+    "**/dist/**",
+    "**/build/**",
+    "**/coverage/**",
+    "**/.git/**",
+    "**/.ai/**",
+    "**/*.generated.*"
+  ],
+  "tsconfig": "tsconfig.json",
+  "frameworks": ["auto"],
+  "output": ".ai/code-map",
+  "includePrivateSymbols": false
+}

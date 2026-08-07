@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 1,
+  "lastUpdated": "2026-08-06",
+  "projects": [
+    {
+      "name": "shade-factory",
+      "defaultPath": null,
+      "metrics": {
+        "files": 524,
+        "symbols": 1474,
+        "relations": 72054,
+        "diagnostics": 14,
+        "freshMs": 8073,
+        "warmMs": 520,
+        "peakRssMiB": 1293,
+        "exactRelations": 42169,
+        "frameworkRelations": 389,
+        "heuristicRelations": 244,
+        "derivedRelations": 29252
+      }
+    },
+    {
+      "name": "crm-back",
+      "defaultPath": null,
+      "metrics": {
+        "files": 209,
+        "symbols": 1912,
+        "relations": 30746,
+        "diagnostics": 0,
+        "freshMs": 7355,
+        "warmMs": 220,
+        "peakRssMiB": 1689,
+        "exactRelations": 19649,
+        "frameworkRelations": 0,
+        "heuristicRelations": 5,
+        "derivedRelations": 11092
+      }
+    },
+    {
+      "name": "crm-front",
+      "defaultPath": null,
+      "metrics": {
+        "files": 786,
+        "symbols": 3055,
+        "relations": 49331,
+        "diagnostics": 349,
+        "freshMs": 6102,
+        "warmMs": 460,
+        "peakRssMiB": 991,
+        "exactRelations": 31678,
+        "frameworkRelations": 708,
+        "heuristicRelations": 351,
+        "derivedRelations": 16594
+      }
+    }
+  ]
+}

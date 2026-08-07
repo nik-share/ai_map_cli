@@ -44,10 +44,14 @@ export function stableJsonLine(value: unknown): string {
 }
 
 export async function atomicWriteIfChanged(filePath: string, content: string): Promise<boolean> {
+  const canonicalBytes = Buffer.from(content, "utf8");
   try {
-    if ((await fs.readFile(filePath, "utf8")) === content) return false;
+    if ((await fs.readFile(filePath)).equals(canonicalBytes)) return false;
   } catch (error) {
-    if (!isNotFound(error)) throw error;
+    // A managed artifact that exists but cannot be read is not a reusable commit. Writing the
+    // replacement through the containing directory lets an ordinary scan repair mode corruption
+    // on platforms where atomic rename-over-existing is supported.
+    if (!isNotFound(error) && !isPermissionDenied(error)) throw error;
   }
 
   await fs.mkdir(path.dirname(filePath), { recursive: true });
@@ -56,7 +60,7 @@ export async function atomicWriteIfChanged(filePath: string, content: string): P
     `.${path.basename(filePath)}.${process.pid}.${Math.random().toString(16).slice(2)}.tmp`,
   );
   try {
-    await fs.writeFile(temporary, content, { encoding: "utf8", mode: 0o644 });
+    await fs.writeFile(temporary, canonicalBytes, { mode: 0o644 });
     await fs.rename(temporary, filePath);
   } catch (error) {
     await fs.rm(temporary, { force: true }).catch(() => undefined);
@@ -71,6 +75,12 @@ export function asJsonValue(value: unknown): JsonValue {
 
 export function isNotFound(error: unknown): error is NodeJS.ErrnoException {
   return error instanceof Error && "code" in error && error.code === "ENOENT";
+}
+
+function isPermissionDenied(error: unknown): error is NodeJS.ErrnoException {
+  return (
+    error instanceof Error && "code" in error && (error.code === "EACCES" || error.code === "EPERM")
+  );
 }
 
 export async function pathExists(filePath: string): Promise<boolean> {

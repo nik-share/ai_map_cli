@@ -17,9 +17,13 @@
         "version"
       ],
       "type": "object"
+    },
+    "__schema1": {
+      "minLength": 1,
+      "type": "string"
     }
   },
-  "$id": "urn:ai-code-map:manifest:1",
+  "$id": "urn:ai-code-map:manifest:4",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "properties": {
@@ -33,18 +37,7 @@
       },
       "type": "array"
     },
-    "configHash": {
-      "pattern": "^[a-f0-9]{64}$",
-      "type": "string"
-    },
-    "schemaVersion": {
-      "const": 1,
-      "type": "number"
-    },
-    "semanticResolver": {
-      "$ref": "#/$defs/__schema0"
-    },
-    "sourceFiles": {
+    "artifacts": {
       "items": {
         "additionalProperties": false,
         "properties": {
@@ -53,13 +46,240 @@
             "type": "string"
           },
           "path": {
-            "minLength": 1,
+            "enum": [
+              "overview.md",
+              "project.json",
+              "files.jsonl",
+              "symbols.jsonl",
+              "relations.jsonl",
+              "diagnostics.json"
+            ],
             "type": "string"
           }
         },
         "required": [
           "path",
           "hash"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "configHash": {
+      "pattern": "^[a-f0-9]{64}$",
+      "type": "string"
+    },
+    "integrityHash": {
+      "pattern": "^[a-f0-9]{64}$",
+      "type": "string"
+    },
+    "producer": {
+      "additionalProperties": false,
+      "properties": {
+        "fingerprint": {
+          "pattern": "^[a-f0-9]{64}$",
+          "type": "string"
+        },
+        "id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "built-in",
+            "custom"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "fingerprint"
+      ],
+      "type": "object"
+    },
+    "schemaVersion": {
+      "const": 4,
+      "type": "number"
+    },
+    "semanticInputs": {
+      "items": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "hash": {
+                "pattern": "^[a-f0-9]{64}$",
+                "type": "string"
+              },
+              "kind": {
+                "const": "file",
+                "type": "string"
+              },
+              "path": {
+                "$ref": "#/$defs/__schema1"
+              }
+            },
+            "required": [
+              "path",
+              "kind",
+              "hash"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "exists": {
+                "type": "boolean"
+              },
+              "kind": {
+                "const": "resolution-probe",
+                "type": "string"
+              },
+              "path": {
+                "$ref": "#/$defs/__schema1"
+              },
+              "scope": {
+                "enum": [
+                  "project",
+                  "toolchain"
+                ],
+                "type": "string"
+              },
+              "targetKind": {
+                "enum": [
+                  "file",
+                  "directory",
+                  "readable-file"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "path",
+              "kind",
+              "scope",
+              "targetKind",
+              "exists"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "hash": {
+                "pattern": "^[a-f0-9]{64}$",
+                "type": "string"
+              },
+              "kind": {
+                "const": "directory-listing",
+                "type": "string"
+              },
+              "path": {
+                "$ref": "#/$defs/__schema1"
+              },
+              "scope": {
+                "enum": [
+                  "project",
+                  "toolchain"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "path",
+              "kind",
+              "scope",
+              "hash"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "const": "symlink",
+                "type": "string"
+              },
+              "path": {
+                "$ref": "#/$defs/__schema1"
+              },
+              "scope": {
+                "enum": [
+                  "project",
+                  "toolchain"
+                ],
+                "type": "string"
+              },
+              "target": {
+                "$ref": "#/$defs/__schema1"
+              }
+            },
+            "required": [
+              "path",
+              "kind",
+              "scope",
+              "target"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "hash": {
+                "pattern": "^[a-f0-9]{64}$",
+                "type": "string"
+              },
+              "kind": {
+                "const": "toolchain-file",
+                "type": "string"
+              },
+              "path": {
+                "$ref": "#/$defs/__schema1"
+              }
+            },
+            "required": [
+              "path",
+              "kind",
+              "hash"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "type": "array"
+    },
+    "semanticResolver": {
+      "$ref": "#/$defs/__schema0"
+    },
+    "sourceFiles": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "compilerUnit": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "hash": {
+            "pattern": "^[a-f0-9]{64}$",
+            "type": "string"
+          },
+          "lines": {
+            "maximum": 9007199254740991,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "path": {
+            "$ref": "#/$defs/__schema1"
+          }
+        },
+        "required": [
+          "path",
+          "hash",
+          "compilerUnit",
+          "lines"
         ],
         "type": "object"
       },
@@ -72,11 +292,15 @@
   "required": [
     "schemaVersion",
     "analyzerVersion",
+    "producer",
     "semanticResolver",
     "syntaxParser",
     "analyzers",
     "configHash",
-    "sourceFiles"
+    "sourceFiles",
+    "semanticInputs",
+    "artifacts",
+    "integrityHash"
   ],
   "title": "ai-code-map manifest record",
   "type": "object"

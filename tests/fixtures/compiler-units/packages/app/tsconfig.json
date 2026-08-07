@@ -1,0 +1,16 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@local/*": ["src/local/*"],
+      "@fixture/library": ["../library/src/index.ts"]
+    },
+    "rootDir": "src"
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx"],
+  "exclude": ["vite.config.ts"],
+  "references": [
+    { "path": "../library" }
+  ]
+}
