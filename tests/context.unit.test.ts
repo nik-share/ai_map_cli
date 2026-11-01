@@ -212,3 +212,78 @@ it("does not expand a reference-only class, but still reads a class requested ex
   const explicit = await buildSourceContext(f.map, container.id, { root: f.root });
   expect(explicit.snippets[0]?.endLine).toBe(24);
 });
+
+it("includes exact file-level entry points under the same source budget and freshness checks", async () => {
+  const f = await fixture();
+  const indexed = f.map.files.find((file) => file.path === "caller.ts");
+  const template = f.map.relations[0];
+  if (!indexed || !template) throw new Error("fixture");
+  indexed.id = "file:caller.ts";
+  const edge = {
+    ...template,
+    from: indexed.id,
+    to: f.target.id,
+    type: "references" as const,
+    origin: {
+      ...template.origin,
+      file: "caller.ts",
+      line: 18,
+      range: { startLine: 18, endLine: 18, startColumn: 1, endColumn: 1 },
+    },
+  };
+  f.map.relations = [edge];
+  const result = await buildSourceContext(f.map, f.target.id, { root: f.root });
+  expect(result.fileReferences).toEqual([{ file: "caller.ts", line: 18 }]);
+  expect(result.snippets.find((snippet) => snippet.file === "caller.ts")).toMatchObject({
+    startLine: 1,
+    endLine: 24,
+  });
+  const limited = await buildSourceContext(f.map, f.target.id, { root: f.root, maxLines: 11 });
+  expect(limited.usedLines).toBe(11);
+  expect(limited.omitted).toContainEqual({
+    id: indexed.id,
+    file: "caller.ts",
+    startLine: 2,
+    endLine: 24,
+  });
+  await writeFile(join(f.root, "caller.ts"), "changed");
+  await expect(buildSourceContext(f.map, f.target.id, { root: f.root })).rejects.toMatchObject({
+    code: "STALE_SOURCE",
+  });
+});
+
+it("bounds large file-reference windows and ignores uncertain and non-canonical file endpoints", async () => {
+  const f = await fixture();
+  const indexed = f.map.files.find((file) => file.path === "caller.ts");
+  const template = f.map.relations[0];
+  if (!indexed || !template) throw new Error("fixture");
+  const source = Array.from({ length: 150 }, (_, i) => `route line ${i + 1}`).join("\n");
+  await writeFile(join(f.root, "caller.ts"), source);
+  indexed.id = "file:caller.ts";
+  indexed.hash = hashText(source);
+  const edge = {
+    ...template,
+    from: indexed.id,
+    to: f.target.id,
+    type: "references" as const,
+    origin: {
+      ...template.origin,
+      file: "caller.ts",
+      line: 100,
+      range: { startLine: 100, endLine: 100, startColumn: 1, endColumn: 1 },
+    },
+  };
+  f.map.relations = [
+    edge,
+    { ...edge, origin: { ...edge.origin, line: 20, classification: "heuristic" } },
+    { ...edge, from: "file:unknown.ts", origin: { ...edge.origin, line: 30 } },
+  ];
+  const result = await buildSourceContext(f.map, f.target.id, { root: f.root });
+  expect(result.fileReferences).toEqual([{ file: "caller.ts", line: 100 }]);
+  expect(result.snippets.find((snippet) => snippet.file === "caller.ts")).toMatchObject({
+    startLine: 92,
+    endLine: 108,
+  });
+  f.map.relations.reverse();
+  expect(await buildSourceContext(f.map, f.target.id, { root: f.root })).toEqual(result);
+});

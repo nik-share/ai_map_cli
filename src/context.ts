@@ -35,6 +35,7 @@ export interface ContextResult {
   selected: { id: string; role: "match" | "neighbor" }[];
   snippets: ContextSnippet[];
   omitted: ContextOmission[];
+  fileReferences: { file: string; line: number }[];
   tests: { file: string; line: number }[];
   omittedNavigation: number;
   usedLines: number;
@@ -60,7 +61,7 @@ export async function buildSourceContext(
   const seeds = budget(options.seeds ?? 3, 1, 5, "context seeds");
   const files = new Map<string, { lines: string[]; included: Set<number> }>();
   const indexedFiles = new Map(map.files.map((f) => [f.path, f]));
-  const sourceFile = async (symbol: SymbolSearchMatch) => {
+  const sourceFile = async (symbol: Pick<SymbolSearchMatch, "id" | "file" | "range">) => {
     let file = files.get(symbol.file);
     if (!file) {
       const indexed = indexedFiles.get(symbol.file);
@@ -134,6 +135,7 @@ export async function buildSourceContext(
     selected: [],
     snippets: [],
     omitted: [],
+    fileReferences: [],
     tests: [],
     omittedNavigation: 0,
     usedLines: 0,
@@ -163,13 +165,39 @@ export async function buildSourceContext(
   );
   result.tests = testSites.slice(0, 8);
   result.omittedNavigation += Math.max(0, testSites.length - result.tests.length);
+  // Top-level registrations have a file endpoint, so symbol-only navigation
+  // cannot return them. Keep their mapped call/reference sites explicitly.
+  const roots = new Set(matches.map((match) => match.id));
+  const filesById = new Map(map.files.map((file) => [file.id, file]));
+  const references = new Map<string, { file: string; line: number }>();
+  for (const relation of map.relations) {
+    if (!roots.has(relation.to) || !["calls", "references"].includes(relation.type)) continue;
+    const origin = relation.origin;
+    if (!["exact", "framework-derived"].includes(origin.classification)) continue;
+    const file = filesById.get(relation.from);
+    if (
+      !file ||
+      file.path !== origin.file ||
+      /(?:^|\/)__tests__\/|\.(?:test|spec)\.[^/]+$/.test(file.path)
+    )
+      continue;
+    references.set(`${file.path}:${origin.line}`, { file: file.path, line: origin.line });
+  }
+  const fileSites = [...references.values()].sort(
+    (a, b) => compareText(a.file, b.file) || a.line - b.line,
+  );
+  result.fileReferences = fileSites.slice(0, 4);
+  result.omittedNavigation += Math.max(0, fileSites.length - result.fileReferences.length);
   result.selected = [...selected].map(([id, role]) => ({ id, role }));
-  for (const [id] of selected) {
-    const symbol = byId.get(id);
-    if (!symbol) throw new CodeMapError("SYMBOL_NOT_FOUND", `Missing context symbol: ${id}`);
-    const file = await sourceFile(symbol);
-    const first = Math.max(1, symbol.range.startLine - 2);
-    const last = Math.min(file.lines.length, symbol.range.endLine + 2);
+  const requested: ContextOmission[] = [];
+  const includeWindow = (
+    id: string,
+    name: string,
+    file: { lines: string[]; included: Set<number> },
+    first: number,
+    last: number,
+  ) => {
+    requested.push({ id, file: name, startLine: first, endLine: last });
     for (let line = first; line <= last; line++) {
       if (file.included.has(line)) continue;
       // Count a separator for every line, conservatively also for each snippet's final line.
@@ -179,20 +207,47 @@ export async function buildSourceContext(
       result.usedLines++;
       result.usedChars += chars;
     }
-  }
-  // Report unread intervals after all candidates have contributed their potentially shared lines.
+  };
   for (const [id] of selected) {
     const symbol = byId.get(id);
-    if (!symbol) continue;
-    const file = files.get(symbol.file);
+    if (!symbol) throw new CodeMapError("SYMBOL_NOT_FOUND", `Missing context symbol: ${id}`);
+    const file = await sourceFile(symbol);
+    includeWindow(
+      id,
+      symbol.file,
+      file,
+      Math.max(1, symbol.range.startLine - 2),
+      Math.min(file.lines.length, symbol.range.endLine + 2),
+    );
+  }
+  for (const site of result.fileReferences) {
+    const indexed = indexedFiles.get(site.file);
+    if (!indexed) throw new CodeMapError("SOURCE_NOT_FOUND", `No indexed file for ${site.file}`);
+    const file = await sourceFile({
+      id: indexed.id,
+      file: site.file,
+      range: { startLine: site.line, endLine: site.line, startColumn: 1, endColumn: 1 },
+    });
+    const small = file.lines.length <= 80;
+    includeWindow(
+      indexed.id,
+      site.file,
+      file,
+      small ? 1 : Math.max(1, site.line - 8),
+      small ? file.lines.length : Math.min(file.lines.length, site.line + 8),
+    );
+  }
+  // Report unread intervals after all candidates have contributed their potentially shared lines.
+  for (const request of requested) {
+    const file = files.get(request.file);
     if (!file) continue;
-    const last = Math.min(file.lines.length, symbol.range.endLine + 2);
+    const last = request.endLine;
     let missingStart: number | undefined;
-    for (let line = Math.max(1, symbol.range.startLine - 2); line <= last + 1; line++) {
+    for (let line = request.startLine; line <= last + 1; line++) {
       const missing = line <= last && !file.included.has(line);
       if (missing && missingStart === undefined) missingStart = line;
       if (!missing && missingStart !== undefined) {
-        result.omitted.push({ id, file: symbol.file, startLine: missingStart, endLine: line - 1 });
+        result.omitted.push({ ...request, startLine: missingStart, endLine: line - 1 });
         missingStart = undefined;
       }
     }
@@ -243,8 +298,12 @@ export function formatSourceContext(result: ContextResult): string {
   const lines = [
     `Context: ${result.selected.length} selected symbols, ${result.usedLines}/${result.limits.maxLines} source lines; ${result.usedChars}/${result.limits.maxChars} source characters.`,
     `Matches: ${result.matches.map((m) => `${m.name}${m.unmatchedTerms?.length ? ` (unmatched: ${m.unmatchedTerms.join(", ")})` : ""}`).join(", ")}.`,
-    "Scope: matches and direct exact/framework-derived neighbors; reference-only classes are not expanded. Source determines behavior.",
+    "Scope: matches, direct exact/framework-derived neighbors and file-level reference sites; reference-only classes are not expanded. Source determines behavior.",
   ];
+  if (result.fileReferences.length)
+    lines.push(
+      `File reference sites: ${result.fileReferences.map((site) => `${site.file}:${site.line}`).join(", ")}.`,
+    );
   for (const snippet of result.snippets) {
     lines.push(`\n${snippet.file}:${snippet.startLine}-${snippet.endLine}`);
     lines.push(...snippet.source.split("\n").map((line, i) => `${snippet.startLine + i}: ${line}`));

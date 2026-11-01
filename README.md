@@ -149,6 +149,10 @@ An exact name or ID takes precedence. Each selected match expands once using the
 bounded navigation rules of `read`; reference-only class neighbors are counted as
 omitted, so a namespace reference does not load every method. Explicit class
 queries remain supported. Source windows include two context lines.
+Up to four incoming file-level call/reference sites are also included, such as
+route registrations outside any function. Files of at most 80 lines are read in
+full; larger files use eight lines on each side of the mapped site. These windows
+share the same budgets and source validation as symbol windows.
 Overlapping and adjacent ranges in the same file are emitted together with original
 line numbers. Shared budgets are 800 source lines and 32,000 source characters
 (including line separators); headers and bounded metadata are additional.
