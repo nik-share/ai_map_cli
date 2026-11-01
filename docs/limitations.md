@@ -31,6 +31,18 @@
 - No watch/incremental compiler mode. Current default maps are validated and reused, but stale scans rebuild compiler state from scratch.
 - No multi-process Program reuse between scans.
 
+## Dependencies and scan exclusions
+
+- Default source discovery excludes `**/node_modules/**`. Dependency files are not indexed as
+  project files or symbols.
+- Source exclusion does not prohibit compiler reads. TypeScript still needs dependency declarations
+  and package metadata to resolve imports and types; consumed inputs participate in freshness checks.
+- Keep installed dependencies inside the selected project root. Replacing `node_modules` with a
+  symlink to another checkout can cause unresolved imports because the bounded compiler host does
+  not follow dependency paths outside that root.
+- The repository's `node_modules/` Git ignore rule already covers nested dependency directories.
+  Git ignore rules do not remove the compiler's need for dependency type information.
+
 ## Non-goals for this baseline
 
 - No task-planner reasoning is provided by the map itself.

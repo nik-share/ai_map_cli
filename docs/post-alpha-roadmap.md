@@ -287,6 +287,22 @@ Compare at least:
 
 Use the same model, instructions, tool access, repository revision, and context ceiling. Randomize task order where practical and keep evaluators blind to the arm.
 
+### Pilot setup lessons (2026-11-01)
+
+- Check CLI/model compatibility before collecting task results. Codex CLI `0.135.0` rejected
+  `gpt-6-astra`; the pilot used CLI `0.166.0` in a temporary directory without changing the global
+  installation. Preserve the selected model when repairing the runner.
+- Use physical dependency copies inside each temporary project root, preserving internal package
+  symlinks. An external `node_modules` symlink increased unresolved-import diagnostics and invalidated
+  the initial setup. After replacing it, all six map companion artifacts matched the reference
+  byte for byte. Source discovery must still exclude dependency files.
+- Fix tasks, scoring criteria, repeats, and a stopping budget before measured runs. Record failed
+  setup attempts separately; do not hide their overhead or mix them with valid A/B results. Keep
+  the original deadline when repairing the environment.
+- Record actual input, cached-input, and output usage. Cached input is a subset of input, not an
+  additional token count. Report map construction separately when using prebuilt maps.
+- Keep private source excerpts and raw agent logs out of public benchmark reports.
+
 ### Primary metrics
 
 - input and output tokens measured by the actual model/tokenizer;
