@@ -471,9 +471,9 @@ function commandUsesMapNavigation(command: string, variants: Variant[]): boolean
     variants.some((v) => v.mapCli && command.includes(v.mapCli))
   )
     return true;
-  // A negative glob such as --glob '!.ai/**' excludes generated map artifacts.
+  // Negative globs such as '!.ai/**' or '!**/.ai/**' exclude map artifacts.
   // It is not a read. A later unprefixed .ai path in the same command still is.
-  const withoutExclusions = command.replace(/!\.ai(?:\/\*\*)?/g, "");
+  const withoutExclusions = command.replace(/!(?:\*\*\/)?\.ai(?:\/\*\*)?/g, "");
   return /(?:^|[/\s'"])(?:\.\/)?\.ai(?:[/'"\s]|$)/.test(withoutExclusions);
 }
 

@@ -207,6 +207,8 @@ describe("reproducible token benchmark", () => {
     for (const searchCommand of [
       "rg -g '!.ai/**' value entry.ts",
       "rg --glob '!.ai/**' value entry.ts",
+      "rg --glob '!**/.ai/**' value entry.ts",
+      "/bin/zsh -lc \"rg --glob '\"'!**/.ai/**'\"' value entry.ts\"",
       "/bin/zsh -lc \"rg --glob '\"'!.ai/**'\"' value entry.ts\"",
     ]) {
       const exclusion = await fixture({ searchCommand });
@@ -214,13 +216,16 @@ describe("reproducible token benchmark", () => {
       expect(excluded.runs.map((run) => run.errors)).toEqual([[], []]);
       expect(excluded.status).toBe("complete");
     }
-    const access = await fixture({
-      searchCommand: "rg -g '!.ai/**' value .ai/code-map/symbols.jsonl",
-    });
-    const report = await runBenchmark(access.config, access.output);
-    expect(report.runs.find((run) => run.variant === "search")?.errors.join(" ")).toMatch(
-      /map navigation/i,
-    );
+    for (const searchCommand of [
+      "rg -g '!.ai/**' value .ai/code-map/symbols.jsonl",
+      "rg -g '!**/.ai/**' value .ai/code-map/symbols.jsonl",
+    ]) {
+      const access = await fixture({ searchCommand });
+      const report = await runBenchmark(access.config, access.output);
+      expect(report.runs.find((run) => run.variant === "search")?.errors.join(" ")).toMatch(
+        /map navigation/i,
+      );
+    }
     const absolute = await fixture({
       searchCommand: "cat /private/tmp/project/.ai/code-map/symbols.jsonl",
     });
