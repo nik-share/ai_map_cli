@@ -1,3 +1,5 @@
+export { readSymbolSource } from "./read.js";
+export type { ReadSourceOptions, ReadSourceResult } from "./read.js";
 export { ANALYZER_VERSION, CONFIG_VERSION, SCHEMA_VERSION } from "./constants.js";
 export { CodeMapError } from "./errors.js";
 export { initProject, createDefaultConfig, findProjectRoot } from "./config.js";

@@ -10,8 +10,12 @@
 - Read the beginning of `.ai/code-map/overview.md` only when broader project
   structure is needed. Skip it for a focused task with a known area of the code.
 - Find symbols with `pnpm exec ai-code-map find 'search words'`.
-- After `find` identifies a relevant symbol, read its source directly using the
-  returned path and range. Read only the sections needed for the task.
+- After `find` identifies a relevant symbol, use `pnpm exec ai-code-map read '<stable-id>'`.
+  This reads current source through the map, with two context lines and at most
+  80 source lines per call. Follow the printed continuation only if needed.
+- Reuse IDs and source already returned. Do not repeat `find` for a known symbol
+  or read its entire file just to see that symbol. Expand to a specific dependency
+  only when an unresolved question requires it.
 - Use `pnpm exec ai-code-map show '<stable-id>'` only to answer an unresolved
   question about symbol relations. Use an ID returned by `find`; do not call
   `show` merely to redisplay a symbol whose source location is already known.

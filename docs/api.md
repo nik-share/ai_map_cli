@@ -31,6 +31,12 @@ one-sided coherent corruption; a rescan is required.
   - loads persisted map from resolved output directory
 - `computeManifestIntegrityHash(manifest) -> string`
   - computes the canonical code-point-ordered manifest integrity hash used by persistence and tests
+- `readSymbolSource(map, id, { root, limit?, offset? }) -> Promise<ReadSourceResult>`
+  - requires an exact stable ID; reads current source with two context lines per side
+  - `root` is the project root; `limit` defaults to 80 (integer 1..200); `offset` defaults to zero within that window
+  - returns `{ id, file, symbolRange, startLine, endLine, source, truncated, nextOffset? }`
+  - verifies source path containment and indexed file hash; rejects symbolic files, stale source, invalid offsets, and pages over 12,000 characters
+  - does not validate all project dependencies; use `checkFreshness` before navigation
 - `showSymbol(map, selector) -> ShowResult`
   - selectors: exact ID, `kind:name`, `path#name`, exact name/path
   - returns all matching symbols and full relation records; no display filtering

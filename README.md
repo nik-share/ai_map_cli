@@ -96,11 +96,32 @@ show which normalized terms were unmatched. This is lexical search, not semantic
 `read` is not treated as a synonym of `viewed`. For example, `notification mark read` can
 find `markNotificationsAsViewed` through `notification` and `mark`.
 
-Read the returned source range directly. Use `show` when symbol relations are needed.
+Read the selected symbol with `ai-code-map read '<id>'`. Use `show` when symbol relations are needed.
 
 Results include stable IDs usable by `show`, kinds, and full source ranges. The default is ten
 matches; `--limit <1..50>` adjusts this. `--json` returns `{ query, total, truncated, matches }`.
 No matches is a successful empty search. Use `rg` for source text or symbols outside the index.
+
+### `ai-code-map read <id>`
+
+Reads current source using an exact stable ID returned by `find`. Includes two lines
+of context on each side of the symbol. Output is numbered and limited to 80 source
+lines by default; `--limit <1..200>` changes the page size. Long symbols provide an
+explicit `--offset` continuation within the same window. Reuse what you have already
+read; follow a continuation or another symbol only for an unresolved question.
+
+The file must be inside the project root, regular, and match its indexed hash.
+Changed files require `scan` before reading. Source pages over 12,000 characters are
+rejected: reduce `--limit`, or use targeted source search for an oversized single line.
+`--json` includes source, range, truncation, and continuation metadata. Source is read
+on demand and is not added to persisted map artifacts. Run `check` before navigation;
+this command validates the selected source file, not every project dependency.
+
+The packaged `AGENTS.md` describes this navigation workflow. A reusable Codex skill
+is included at `skills/ai-code-map/SKILL.md`. Copy the `ai-code-map` folder to your
+Codex skills directory and invoke `$ai-code-map`. It guides bounded source reading,
+relation lookups, and targeted fallback for unindexed tests; it also supports older
+CLI versions without `read` by using the returned source ranges directly.
 
 ## Generated artifacts
 

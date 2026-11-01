@@ -5,13 +5,14 @@ import { pathToFileURL } from "node:url";
 import { Command, CommanderError, Option } from "commander";
 import packageJson from "../package.json" with { type: "json" };
 
-import { initProject } from "./config.js";
+import { initProject, resolveConfiguration } from "./config.js";
 import { CodeMapError, errorMessage } from "./errors.js";
 import { checkFreshness } from "./freshness.js";
 import { scanProject } from "./scan.js";
 import { findSymbols, type SymbolSearchResult } from "./search.js";
 import { formatShowResult, showSymbol } from "./show.js";
-import { loadCodeMap } from "./storage.js";
+import { readSymbolSource } from "./read.js";
+import { loadCodeMap, loadCodeMapFrom } from "./storage.js";
 import type { LoadCodeMapOptions } from "./types.js";
 
 interface CommonCliOptions {
@@ -105,6 +106,53 @@ export async function runCli(argv = process.argv): Promise<number> {
     );
   addCommonOptions(findCommand);
 
+  const readCommand = program
+    .command("read")
+    .description("Read a bounded source range using an exact symbol ID from the map")
+    .argument("<id>", "exact stable symbol ID from find")
+    .option("--limit <number>", "maximum source lines, 1..200", Number, 80)
+    .option("--offset <number>", "line offset within the symbol window", Number, 0)
+    .option("--json", "print source and continuation metadata as JSON")
+    .action(
+      async (
+        id: string,
+        options: CommonCliOptions & { limit: number; offset: number },
+        command: Command,
+      ) => {
+        const common = collectOptions(command);
+        const resolved = await resolveConfiguration(loadOptions(common));
+        const map = await loadCodeMapFrom(resolved.outputDir);
+        const result = await readSymbolSource(map, id, {
+          root: resolved.root,
+          limit: options.limit,
+          offset: options.offset,
+        });
+        if (options.json) printJson(result);
+        else {
+          const location = ["root", "config", "output"] as const;
+          const suffix = location
+            .map((key) => {
+              const value = common[key];
+              return value ? ` --${key} ${shellQuote(value)}` : "";
+            })
+            .join("");
+          const numbered = result.source
+            .split("\n")
+            .map((line, index) => `${result.startLine + index}: ${line}`);
+          process.stdout.write(
+            [
+              `${result.id}\n${result.file}:${result.startLine}-${result.endLine}`,
+              ...numbered,
+              result.truncated
+                ? `More source remains. Continue: ai-code-map read ${shellQuote(result.id)} --offset ${result.nextOffset} --limit ${options.limit}${suffix}`
+                : "End of symbol window.",
+            ].join("\n") + "\n",
+          );
+        }
+      },
+    );
+  addCommonOptions(readCommand);
+
   const showCommand = program
     .command("show")
     .description("Show one indexed symbol by stable ID, kind:name, path, or exact name")
@@ -184,6 +232,10 @@ function loadOptions(options: CommonCliOptions): LoadCodeMapOptions {
   };
 }
 
+function shellQuote(value: string): string {
+  return "'" + value.replaceAll("'", "'\\''") + "'";
+}
+
 function printJson(value: unknown): void {
   process.stdout.write(`${JSON.stringify(value, null, 2)}\n`);
 }
@@ -204,7 +256,7 @@ function formatSearchResult(result: SymbolSearchResult): string {
         `${id} [${kind}]${unmatchedTerms?.length ? ` (partial; unmatched: ${unmatchedTerms.join(", ")})` : ""}\n  ${file}:${range.startLine}:${range.startColumn}-${range.endLine}:${range.endColumn}`,
     ),
     result.matches.length
-      ? "Read the source ranges above; use ai-code-map show '<id>' for relations."
+      ? "Use ai-code-map read '<id>' for bounded source; show '<id>' for relations."
       : "No matches. Try other words or use rg; only indexed symbols are searchable.",
   ].join("\n");
 }

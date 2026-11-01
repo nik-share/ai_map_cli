@@ -108,7 +108,7 @@ describe("CLI observable behavior", () => {
     const readable = await runCli(["find", "Calculator", "--root", root]);
     expect(readable.stdout).toContain(calculator.id);
     expect(readable.stdout).toContain(`src/service.ts:${calculator.range.startLine}`);
-    expect(readable.stdout).toContain("Read the source ranges above");
+    expect(readable.stdout).toContain("Use ai-code-map read");
     const partial = await runCli(["find", "notification mark read", "--root", root]);
     expect(partial.code, partial.stderr).toBe(0);
     expect(partial.stdout).toContain("markNotificationsAsViewed");
@@ -117,6 +117,19 @@ describe("CLI observable behavior", () => {
     expect(parseCliJson(partialJson)).toMatchObject({
       matches: [{ name: "markNotificationsAsViewed", unmatchedTerms: ["read"] }],
     });
+    const source = await runCli(["read", calculator.id, "--root", root, "--limit", "2", "--json"]);
+    expect(source.code, source.stderr).toBe(0);
+    expect(parseCliJson(source)).toMatchObject({
+      id: calculator.id,
+      file: "src/service.ts",
+      truncated: true,
+      nextOffset: 2,
+    });
+    const sourceText = await runCli(["read", calculator.id, "--root", root, "--limit", "2"]);
+    expect(sourceText.stdout).toContain(`Continue: ai-code-map read '${calculator.id}' --offset 2`);
+    expect(sourceText.stdout).toContain(`--root '${root}'`);
+    const badLimit = await runCli(["read", calculator.id, "--root", root, "--limit", "201"]);
+    expect(badLimit.code).toBe(1);
     const compact = await runCli(["show", calculator.id, "--root", root, "--limit", "1"]);
     expect(compact.code, compact.stderr).toBe(0);
     expect(compact.stdout).toContain("Compact view");
@@ -200,7 +213,7 @@ describe("CLI observable behavior", () => {
   }, 60_000);
 
   it("provides help for every public command", async () => {
-    for (const command of ["init", "scan", "check", "show", "find"]) {
+    for (const command of ["init", "scan", "check", "show", "find", "read"]) {
       const result = await runCli([command, "--help"]);
       expect(result.code, `${command}: ${result.stderr}`).toBe(0);
       expect(result.stdout).toContain("--root");
