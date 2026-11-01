@@ -91,6 +91,43 @@ describe("programmatic API", () => {
 });
 
 describe("CLI observable behavior", () => {
+  it("returns the whole structural map in one call and refuses missing or stale maps", async () => {
+    const root = await fixture("typescript-node");
+    const missing = await runCli(["map", "--root", root, "--json"]);
+    expect(missing.code, missing.stderr).toBe(2);
+    expect(parseCliJson(missing)).toMatchObject({ current: false, status: "missing" });
+    await scanProject({ root });
+    const map = await loadCodeMap({ root });
+    const result = await runCli(["map", "--root", root, "--json"]);
+    expect(result.code, result.stderr).toBe(0);
+    const graph = parseCliJson(result) as {
+      files: { id: string }[];
+      symbols: { id: string }[];
+      relations: { targets: { count: number }[] }[];
+    };
+    expect(graph.files.map((file) => file.id).sort()).toEqual(
+      map.files.map((file) => file.id).sort(),
+    );
+    expect(graph.symbols.map((symbol) => symbol.id).sort()).toEqual(
+      map.symbols.map((symbol) => symbol.id).sort(),
+    );
+    expect(
+      graph.relations
+        .flatMap((group) => group.targets)
+        .reduce((sum, target) => sum + target.count, 0),
+    ).toBe(map.relations.length);
+    const text = await runCli(["map", "--root", root]);
+    expect(text.code, text.stderr).toBe(0);
+    expect(text.stdout).toContain("Complete structural map");
+    expect(text.stdout).toContain(symbolNamed(map, "Calculator").id);
+    expect(text.stdout).toContain("End of map");
+    await writeFile(join(root, "src/changed.ts"), "export const changed = true;\n");
+    const stale = await runCli(["map", "--root", root, "--json"]);
+    expect(stale.code, stale.stderr).toBe(2);
+    expect(parseCliJson(stale)).toMatchObject({ current: false, status: "stale" });
+    expect(parseCliJson(stale)).not.toHaveProperty("symbols");
+  });
+
   it("finds usable selectors, suggests typos, and supports compact/full show without changing JSON", async () => {
     const root = await fixture("typescript-node");
     await writeFile(
@@ -235,7 +272,7 @@ describe("CLI observable behavior", () => {
   }, 60_000);
 
   it("provides help for every public command", async () => {
-    for (const command of ["init", "scan", "check", "show", "find", "read"]) {
+    for (const command of ["init", "scan", "check", "show", "find", "read", "map"]) {
       const result = await runCli([command, "--help"]);
       expect(result.code, `${command}: ${result.stderr}`).toBe(0);
       expect(result.stdout).toContain("--root");

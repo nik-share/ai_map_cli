@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add `map` to check freshness and return the complete structural graph in one call, with short references and grouped relation counts.
+
 - Include bounded direct symbol links and test call sites on the first `read` page, with reusable IDs and omission counts.
 
 - Add map-guided `read` / `readSymbolSource` with bounded source pages, freshness checks, and continuation; update and package agent navigation instructions and a reusable Codex skill.

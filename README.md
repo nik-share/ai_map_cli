@@ -24,13 +24,14 @@ pnpm exec ai-code-map show Calculator
 
 ### Exit codes
 
-| Command | Success                   | Failure behavior                                    |
-| ------- | ------------------------- | --------------------------------------------------- |
-| `init`  | `0`                       | invalid configuration or environment errors -> `1`  |
-| `scan`  | `0`                       | parser errors with `--strict` -> `3`, otherwise `0` |
-| `check` | `0` when current          | stale map -> `2`, missing map -> `2`                |
-| `show`  | `0`                       | no match -> `1`                                     |
-| `find`  | `0`, including no matches | invalid query or limit -> `1`                       |
+| Command | Success                   | Failure behavior                                           |
+| ------- | ------------------------- | ---------------------------------------------------------- |
+| `init`  | `0`                       | invalid configuration or environment errors -> `1`         |
+| `scan`  | `0`                       | parser errors with `--strict` -> `3`, otherwise `0`        |
+| `check` | `0` when current          | stale map -> `2`, missing map -> `2`                       |
+| `map`   | `0` when current          | stale, missing, or invalid map -> `2`; other errors -> `1` |
+| `show`  | `0`                       | no match -> `1`                                            |
+| `find`  | `0`, including no matches | invalid query or limit -> `1`                              |
 
 ## CLI command matrix
 
@@ -60,6 +61,38 @@ Compares the persisted `manifest.json` against current state and config:
 - schema compatibility
 
 Returns `Current` or `Stale` with machine-readable reasons and change lists.
+
+### `ai-code-map map`
+
+Prints the complete structural map in one call. It checks freshness internally;
+no separate `check` call is needed. If the map is missing, stale, or invalid, it
+returns exit code 2 without printing the graph. Run `scan` to rebuild it.
+
+```bash
+pnpm exec ai-code-map map
+pnpm exec ai-code-map map --json
+```
+
+The output includes every indexed file and symbol, plus every relation endpoint.
+Files, symbols, and other endpoints receive short references (`f1`, `s1`, `e1`)
+used in the relation table. Symbols also show their stable IDs and source lines.
+Use the stable ID with `read`; short references apply only to this output and may
+change after a rescan.
+
+Relations are grouped by source, type, and evidence classification. A target such
+as `s2*3` represents three occurrence records. All classifications are retained,
+including heuristic and derived links; these must not be interpreted as exact
+calls. Source text, signatures, facts, and per-occurrence evidence are excluded.
+Use `show --json` for detailed evidence and `read` for current source.
+
+There is no pagination or silent row limit. The `End of map` marker confirms that
+the CLI reached the end; a calling tool may still truncate a large response.
+The whole map can exceed an agent's output or context limit. One call does not
+guarantee fewer tokens than focused navigation. Redirect to a file when needed:
+
+```bash
+pnpm exec ai-code-map map > /tmp/project-map.txt
+```
 
 ### `ai-code-map show <selector>`
 

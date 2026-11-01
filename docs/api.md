@@ -29,6 +29,15 @@ one-sided coherent corruption; a rescan is required.
   - compares indexed sources, compiler-consumed files, project/toolchain-scoped typed resolution probes, observed directory listings and symlinks, consumed TypeScript libraries, configuration, and producer compatibility with current project state
 - `loadCodeMap(options?) -> Promise<CodeMap>`
   - loads persisted map from resolved output directory
+- `buildProjectMap(map) -> ProjectMapView`
+  - projects a validated `CodeMap` into all indexed files, symbols, other endpoints, and grouped relations; does not mutate the input or check freshness
+  - returns `{ project, counts, files, symbols, endpoints, relations }`; nodes carry output-local `ref` values and original stable IDs
+  - symbol `file` points to a file ref; symbol `range` retains source coordinates
+  - relation groups contain `{ from, type, classification, targets: [{ ref, count }] }`; counts preserve all occurrence records, including heuristic and derived relations
+  - excludes source text, signatures, facts, and individual origin/confidence records; use the original map for that evidence
+- `formatProjectMap(view) -> string`
+  - deterministic complete text with short references, stable symbol IDs, source lines, evidence classifications, and occurrence counts; no pagination or row limit
+  - the CLI `map` command checks freshness and reuses the validated map before calling these functions; missing/stale/invalid artifacts return exit code 2
 - `computeManifestIntegrityHash(manifest) -> string`
   - computes the canonical code-point-ordered manifest integrity hash used by persistence and tests
 - `readSymbolSource(map, id, { root, limit?, offset? }) -> Promise<ReadSourceResult>`

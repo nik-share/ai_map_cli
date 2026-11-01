@@ -7,12 +7,13 @@ import packageJson from "../package.json" with { type: "json" };
 
 import { initProject, resolveConfiguration } from "./config.js";
 import { CodeMapError, errorMessage } from "./errors.js";
-import { checkFreshness } from "./freshness.js";
+import { checkFreshness, inspectFreshness } from "./freshness.js";
 import { scanProject } from "./scan.js";
 import { findSymbols, type SymbolSearchResult } from "./search.js";
 import { formatShowResult, showSymbol } from "./show.js";
 import { readSymbolSource } from "./read.js";
 import { formatReadNavigation } from "./read-navigation.js";
+import { buildProjectMap, formatProjectMap } from "./project-map.js";
 import { loadCodeMap, loadCodeMapFrom } from "./storage.js";
 import type { LoadCodeMapOptions } from "./types.js";
 
@@ -90,6 +91,28 @@ export async function runCli(argv = process.argv): Promise<number> {
       if (!result.current) exitCode = 2;
     });
   addCommonOptions(checkCommand);
+
+  const mapCommand = program
+    .command("map")
+    .description("Check freshness and print the complete structural map in one call")
+    .option("--json", "print all nodes and grouped relations as JSON")
+    .action(async (_options: CommonCliOptions, command: Command) => {
+      const common = collectOptions(command);
+      const inspection = await inspectFreshness(loadOptions(common));
+      if (!inspection.result.current || !inspection.map) {
+        if (common.json) printJson(inspection.result);
+        else
+          process.stdout.write(
+            `Map unavailable: ${inspection.result.reasons.join(" ")} Run ai-code-map scan.\n`,
+          );
+        exitCode = 2;
+        return;
+      }
+      const view = buildProjectMap(inspection.map);
+      if (common.json) printJson(view);
+      else process.stdout.write(`${formatProjectMap(view)}\n`);
+    });
+  addCommonOptions(mapCommand);
 
   const findCommand = program
     .command("find")
