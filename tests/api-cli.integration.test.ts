@@ -95,7 +95,11 @@ describe("CLI observable behavior", () => {
     const root = await fixture("typescript-node");
     await writeFile(
       join(root, "src/notifications.ts"),
-      "export function markNotificationsAsViewed() {}\n",
+      "export function markNotificationsAsViewed() {\n  notify();\n}\nexport function notify() {}\n",
+    );
+    await writeFile(
+      join(root, "src/notifications.spec.ts"),
+      'import { markNotificationsAsViewed } from "./notifications";\nmarkNotificationsAsViewed();\n',
     );
     await scanProject({ root });
     const map = await loadCodeMap({ root });
@@ -128,6 +132,24 @@ describe("CLI observable behavior", () => {
     const sourceText = await runCli(["read", calculator.id, "--root", root, "--limit", "2"]);
     expect(sourceText.stdout).toContain(`Continue: ai-code-map read '${calculator.id}' --offset 2`);
     expect(sourceText.stdout).toContain(`--root '${root}'`);
+    const notification = symbolNamed(map, "markNotificationsAsViewed");
+    const notificationPage = await runCli([
+      "read",
+      notification.id,
+      "--root",
+      root,
+      "--limit",
+      "1",
+    ]);
+    expect(notificationPage.code, notificationPage.stderr).toBe(0);
+    expect(notificationPage.stdout).toContain("-> calls function:src/notifications.ts#notify");
+    expect(notificationPage.stdout).toContain("#notify [lines 4-4; exact]");
+    expect(notificationPage.stdout).toContain("src/notifications.spec.ts:2");
+    expect(notificationPage.stdout).toContain("0 omitted");
+    const continuation = await runCli(["read", notification.id, "--root", root, "--offset", "1"]);
+    expect(continuation.code, continuation.stderr).toBe(0);
+    expect(continuation.stdout).not.toContain("Map links:");
+    expect(continuation.stdout).not.toContain("Test call sites:");
     const badLimit = await runCli(["read", calculator.id, "--root", root, "--limit", "201"]);
     expect(badLimit.code).toBe(1);
     const compact = await runCli(["show", calculator.id, "--root", root, "--limit", "1"]);

@@ -110,10 +110,21 @@ lines by default; `--limit <1..200>` changes the page size. Long symbols provide
 explicit `--offset` continuation within the same window. Reuse what you have already
 read; follow a continuation or another symbol only for an unresolved question.
 
+The first page also lists up to eight direct symbol neighbors and four exact incoming
+call sites in test paths (`*.test.*`, `*.spec.*`, or `__tests__/`). Neighbors include
+reusable IDs, source ranges, direction, relation type, and evidence classification.
+Repeated neighbors are merged. Heuristic and derived inverse relations, containment,
+exports, and unresolved or external endpoints are excluded. Test paths are navigation
+hints, not proof of test coverage. Missing entries do not prove that no tests exist.
+The block stays below 4,000 compact JSON characters and reports eligible entries
+omitted by its limits. Continuation pages do not repeat it. Use `show '<id>'` for
+more relations when needed.
+
 The file must be inside the project root, regular, and match its indexed hash.
 Changed files require `scan` before reading. Source pages over 12,000 characters are
 rejected: reduce `--limit`, or use targeted source search for an oversized single line.
-`--json` includes source, range, truncation, and continuation metadata. Source is read
+`--json` includes source, range, truncation, continuation metadata, and first-page
+`navigation`. Source is read
 on demand and is not added to persisted map artifacts. Run `check` before navigation;
 this command validates the selected source file, not every project dependency.
 

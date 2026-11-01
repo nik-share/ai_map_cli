@@ -34,7 +34,11 @@ one-sided coherent corruption; a rescan is required.
 - `readSymbolSource(map, id, { root, limit?, offset? }) -> Promise<ReadSourceResult>`
   - requires an exact stable ID; reads current source with two context lines per side
   - `root` is the project root; `limit` defaults to 80 (integer 1..200); `offset` defaults to zero within that window
-  - returns `{ id, file, symbolRange, startLine, endLine, source, truncated, nextOffset? }`
+  - returns `{ id, file, symbolRange, startLine, endLine, source, truncated, nextOffset?, navigation? }`
+  - at offset zero, `navigation` contains `{ links, tests, omittedLinks, omittedTests }`; continuation pages omit it
+  - each link has `{ direction, type, id, file, startLine, endLine, classification }`; exact and framework-derived internal neighbors only, deduplicated by direction and ID
+  - `tests` contains exact incoming call sites `{ file, line }` in `*.test.*`, `*.spec.*`, or `__tests__/` paths; this is a navigation hint, not a coverage claim
+  - limits navigation to eight links, four test sites, and fewer than 4,000 compact JSON characters; omission counts refer to eligible unique neighbors/sites excluded by these limits
   - verifies source path containment and indexed file hash; rejects symbolic files, stale source, invalid offsets, and pages over 12,000 characters
   - does not validate all project dependencies; use `checkFreshness` before navigation
 - `showSymbol(map, selector) -> ShowResult`

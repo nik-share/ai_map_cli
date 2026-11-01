@@ -12,6 +12,7 @@ import { scanProject } from "./scan.js";
 import { findSymbols, type SymbolSearchResult } from "./search.js";
 import { formatShowResult, showSymbol } from "./show.js";
 import { readSymbolSource } from "./read.js";
+import { formatReadNavigation } from "./read-navigation.js";
 import { loadCodeMap, loadCodeMapFrom } from "./storage.js";
 import type { LoadCodeMapOptions } from "./types.js";
 
@@ -146,6 +147,7 @@ export async function runCli(argv = process.argv): Promise<number> {
               result.truncated
                 ? `More source remains. Continue: ai-code-map read ${shellQuote(result.id)} --offset ${result.nextOffset} --limit ${options.limit}${suffix}`
                 : "End of symbol window.",
+              ...(result.navigation ? formatReadNavigation(result.navigation) : []),
             ].join("\n") + "\n",
           );
         }

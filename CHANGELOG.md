@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Include bounded direct symbol links and test call sites on the first `read` page, with reusable IDs and omission counts.
+
 - Add map-guided `read` / `readSymbolSource` with bounded source pages, freshness checks, and continuation; update and package agent navigation instructions and a reusable Codex skill.
 
 - Improve multiword symbol search with common plural normalization, name-aware ranking, and explicitly labeled partial matches.

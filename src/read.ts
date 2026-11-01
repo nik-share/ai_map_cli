@@ -3,6 +3,7 @@ import { CodeMapError } from "./errors.js";
 import type { CodeMap, SourceRange } from "./types.js";
 import { hashText } from "./utils/hash.js";
 import { readFileInsideRoot } from "./utils/path.js";
+import { buildReadNavigation, type ReadNavigation } from "./read-navigation.js";
 
 export interface ReadSourceOptions {
   root: string;
@@ -20,6 +21,8 @@ export interface ReadSourceResult {
   source: string;
   truncated: boolean;
   nextOffset?: number;
+  /** Bounded direct links and test call sites, present only at offset zero. */
+  navigation?: ReadNavigation;
 }
 
 /** Read current source using an exact map ID, never a fuzzy selector. */
@@ -78,5 +81,6 @@ export async function readSymbolSource(
     source,
     truncated,
     ...(truncated ? { nextOffset: offset + endLine - startLine + 1 } : {}),
+    ...(offset === 0 ? { navigation: buildReadNavigation(map, id) } : {}),
   };
 }

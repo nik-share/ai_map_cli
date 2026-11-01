@@ -4,6 +4,8 @@ import { join } from "node:path";
 import { afterEach, expect, it } from "vitest";
 import { readSymbolSource } from "../src/read.js";
 import type { CodeMap } from "../src/types.js";
+import type { RelationRecord } from "../src/types.js";
+import { SCHEMA_VERSION } from "../src/constants.js";
 import { hashText } from "../src/utils/hash.js";
 
 const roots: string[] = [];
@@ -16,6 +18,7 @@ async function fixture() {
   const source = Array.from({ length: 120 }, (_, i) => `line ${i + 1}`).join("\r\n");
   await writeFile(join(root, "source.ts"), source);
   const map = {
+    relations: [] as RelationRecord[],
     files: [{ path: "source.ts", hash: hashText(source) }],
     symbols: [
       {
@@ -40,6 +43,128 @@ it("reads only the mapped range with two context lines and bounded continuation"
   expect(last).toMatchObject({ startLine: 88, endLine: 112, truncated: false });
   expect(last.source).not.toContain("line 113");
   expect(last.nextOffset).toBeUndefined();
+});
+
+function edge(from: string, to: string, overrides: Partial<RelationRecord> = {}): RelationRecord {
+  return {
+    schemaVersion: SCHEMA_VERSION,
+    from,
+    to,
+    type: "calls",
+    confidence: 1,
+    origin: {
+      file: "source.ts",
+      line: 20,
+      range: { startLine: 20, endLine: 20, startColumn: 1, endColumn: 10 },
+      classification: "exact",
+      explanation: "Resolved call",
+      analyzer: "typescript-node",
+    },
+    ...overrides,
+  };
+}
+
+it("returns direct reusable IDs and test call sites only on the first source page", async () => {
+  const { root, map, id, symbol } = await fixture();
+  const dependency = { ...symbol, id: "function:source.ts#helper", name: "helper" };
+  const caller = { ...symbol, id: "function:source.ts#caller", name: "caller" };
+  map.symbols.push(dependency, caller);
+  const call = edge(id, dependency.id);
+  const test = edge("file:source.test.ts", id);
+  test.origin.file = "source.test.ts";
+  test.origin.line = 72;
+  map.relations = [
+    call,
+    call,
+    edge(id, dependency.id, { type: "references" }),
+    edge(id, dependency.id, {
+      type: "uses-hook",
+      origin: { ...call.origin, classification: "framework-derived" },
+    }),
+    edge(caller.id, id),
+    test,
+    test,
+    edge(id, "unresolved:missing"),
+    edge(id, "external:pkg"),
+    edge(id, caller.id, { type: "contains" }),
+    edge(id, caller.id, { origin: { ...call.origin, classification: "heuristic" } }),
+    edge(id, caller.id, { type: "used-by", origin: { ...call.origin, classification: "derived" } }),
+  ];
+  const first = await readSymbolSource(map, id, { root, limit: 2 });
+  expect(first.navigation).toEqual({
+    links: [
+      {
+        direction: "outgoing",
+        type: "calls",
+        id: dependency.id,
+        file: "source.ts",
+        startLine: 10,
+        endLine: 110,
+        classification: "exact",
+      },
+      {
+        direction: "incoming",
+        type: "calls",
+        id: caller.id,
+        file: "source.ts",
+        startLine: 10,
+        endLine: 110,
+        classification: "exact",
+      },
+    ],
+    tests: [{ file: "source.test.ts", line: 72 }],
+    omittedLinks: 0,
+    omittedTests: 0,
+  });
+  map.relations.reverse();
+  expect((await readSymbolSource(map, id, { root })).navigation).toEqual(first.navigation);
+  expect((await readSymbolSource(map, dependency.id, { root })).id).toBe(dependency.id);
+  const next = await readSymbolSource(map, id, { root, offset: 2 });
+  expect(next).not.toHaveProperty("navigation");
+});
+
+it("bounds navigation rows and reports omitted neighbors and test sites", async () => {
+  const { root, map, id, symbol } = await fixture();
+  for (let i = 0; i < 10; i++) {
+    const target = { ...symbol, id: `function:source.ts#helper${i}` };
+    map.symbols.push(target);
+    map.relations.push(edge(id, target.id));
+    const test = edge("file:__tests__/source.ts", id);
+    test.origin.file = "__tests__/source.ts";
+    test.origin.line = i + 1;
+    map.relations.push(test);
+  }
+  const { navigation } = await readSymbolSource(map, id, { root });
+  expect(navigation?.links).toHaveLength(8);
+  expect(navigation?.tests).toEqual(
+    [1, 2, 3, 4].map((line) => ({ file: "__tests__/source.ts", line })),
+  );
+  expect(navigation).toMatchObject({ omittedLinks: 2, omittedTests: 6 });
+});
+
+it("omits oversized navigation entries without truncating reusable IDs", async () => {
+  const { root, map, id, symbol } = await fixture();
+  const huge = { ...symbol, id: `function:source.ts#${"a".repeat(5000)}` };
+  const small = { ...symbol, id: "function:source.ts#z" };
+  map.symbols.push(huge, small);
+  map.relations = [edge(id, huge.id), edge(id, small.id)];
+  const { navigation } = await readSymbolSource(map, id, { root });
+  expect(navigation?.links.map((link) => link.id)).toEqual([small.id]);
+  expect(navigation?.omittedLinks).toBe(1);
+  expect(JSON.stringify(navigation).length).toBeLessThanOrEqual(4000);
+
+  // Individually small entries must also obey the shared character budget.
+  const medium = Array.from({ length: 8 }, (_, i) => ({
+    ...symbol,
+    id: `function:source.ts#${String(i).repeat(1000)}`,
+  }));
+  map.symbols.push(...medium);
+  map.relations = medium.map((target) => edge(id, target.id));
+  const combined = (await readSymbolSource(map, id, { root })).navigation;
+  expect(JSON.stringify(combined).length).toBeLessThanOrEqual(4000);
+  expect(combined?.links.length).toBeGreaterThan(0);
+  expect(combined?.omittedLinks).toBeGreaterThan(0);
+  expect((combined?.links.length ?? 0) + (combined?.omittedLinks ?? 0)).toBe(8);
 });
 it("rejects stale source and missing exact IDs instead of reading a guessed location", async () => {
   const { root, map, id } = await fixture();
