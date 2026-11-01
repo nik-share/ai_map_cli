@@ -1,6 +1,6 @@
 {
   "name": "ai-code-map",
-  "version": "0.1.0",
+  "version": "0.1.0-alpha.2",
   "description": "Local, deterministic semantic code maps for AI coding agents",
   "type": "module",
   "sideEffects": false,

@@ -14,6 +14,7 @@ import { dirname, join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
+import * as compilerWorker from "../src/compiler-worker-client.js";
 
 import {
   checkFreshness,
@@ -23,7 +24,6 @@ import {
   ReactAnalyzer,
   scanProject,
   TypeScriptParserAdapter,
-  TypeScriptSemanticResolver,
 } from "../src/index.js";
 import type {
   CodeMap,
@@ -544,7 +544,7 @@ describe("Milestone 1 compiler-unit behavior", () => {
     const output = join(root, ".ai/unchanged-reuse-map");
     const first = await scanProject({ root, config, output });
     const before = await readPersistedMap(root, output);
-    const semantic = vi.spyOn(TypeScriptSemanticResolver.prototype, "resolve");
+    const semantic = vi.spyOn(compilerWorker, "runCompilerUnitWorker");
     const core = vi.spyOn(CoreAnalyzer.prototype, "analyze");
     const react = vi.spyOn(ReactAnalyzer.prototype, "analyze");
     const parser = vi.spyOn(TypeScriptParserAdapter.prototype, "parse");
@@ -582,7 +582,7 @@ describe("Milestone 1 compiler-unit behavior", () => {
     const config = join(root, ".ai/code-map/config.json");
     const output = join(root, ".ai/stale-reuse-map");
     await scanProject({ root, config, output });
-    const semantic = vi.spyOn(TypeScriptSemanticResolver.prototype, "resolve");
+    const semantic = vi.spyOn(compilerWorker, "runCompilerUnitWorker");
     const outputFile = (name: string): string => join(output, name);
 
     const mutations: Array<{ name: string; apply: () => Promise<void> }> = [

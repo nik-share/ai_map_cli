@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-11-01
+
+### 0.1.0-alpha.2
+
+- Release compiler memory after each unit in default scans by using sequential workers.
+- Avoid unused TypeScript JSDoc parsing while preserving JavaScript JSDoc type information.
+- Preserve in-process behavior and full JSDoc for custom analyzers and semantic resolvers.
+- Retain semantic closure, artifact validation, CWD independence, and unchanged-map reuse.
+- Advance the semantic resolver version; maps from the previous version require a rescan.
+
 ## 2026-08-06
 
 ### 0.1.0

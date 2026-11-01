@@ -54,9 +54,15 @@
 - Schema v4 redundancy detects ordinary and one-sided coherent corruption, including false compiler
   ownership and line counts. It is not a cryptographic signature against rewriting every redundant
   ownership record and integrity hash.
-- Milestone 1.1 final fresh time exceeds the investigation threshold on all three measured targets, while peak RSS improves on `shade-factory`, rises modestly on `crm-back`, and remains materially above the prior gate on `crm-front`. The measured deltas and likely contributors (larger relation sets, compiler closure capture, and serialization) are documented in the [Milestone 1.1 report](../benchmarks/results/milestone-1-1-real-world-2026-08-06.md).
-- The later packed-package Milestone 1.1.1 dirty-tree run exceeded the established peak-RSS gate on
-  all three targets. That run remains provisional and private-path-sensitive; release approval
-  requires a clean-commit rerun plus an explicit memory go/no-go decision.
+- Default scans use a separate sequential worker for each compiler unit. Each worker exits before
+  the next unit starts, releasing compiler memory before normalization and persistence. This adds
+  startup overhead, particularly for small projects with many configs. A single large compiler unit
+  can still use substantial memory; there is no fixed heap cap or partial-analysis fallback.
+- Custom analyzers, parsers, and semantic resolvers run in-process to preserve extension behavior.
+  Their memory use is not covered by the default-pipeline resource guarantee. Full JSDoc remains
+  available to custom analyzers; default workers parse only the JSDoc needed for type information.
+- The [alpha.2 release benchmark](../benchmarks/results/release-alpha-2-2026-11-01.md) records the
+  current resource measurements. August source commits were restored with copied installed
+  dependencies; those dependency trees are not claimed to reproduce the August installation.
 - Next.js and NestJS analyzers remain experimental and default-off.
 - Any future Tree-sitter production path is still explicitly off for this milestone.

@@ -1,7 +1,7 @@
 # Post-alpha execution roadmap
 
-> Status: Milestones 1, 1.1, and the 1.1.1 correctness closure are implemented; the clean-commit
-> official benchmark and resource go/no-go remain pending before Milestone 2.
+> Status: Milestones 1, 1.1, and 1.1.1 are implemented. Alpha.2 adds bounded compiler lifetimes.
+> The alpha.2 release benchmark records the resource decision before Milestone 2.
 
 This document turns the high-level backlog into an ordered, measurable delivery plan. `PROJECT.md`
 remains the product and architecture source of truth. The
@@ -181,7 +181,7 @@ Warm scans remain 89.8–94.9% faster than fresh scans in the final recorded run
 
 ## Milestone 1.1.1 — correctness closure and release-grade validation
 
-Priority: **P0, implementation complete; provisional benchmark pending final run**.
+Priority: **P0, implementation complete; resource closure in alpha.2**.
 
 This closure requires checker-identity import provenance, occurrence-preserving React evidence,
 raw-byte artifact repair, canonical integrity helpers, redundant ownership validation, portable
@@ -198,9 +198,16 @@ commit authorization. The alpha RSS gates remain 1,246 MiB, 1,443 MiB, and 972 M
 both `crm-back` and `crm-front` were above them in the prior M1.1 measurements, so go/no-go cannot be
 implied by correctness alone.
 
-The later dirty-tree packed-package run exceeded all three RSS gates. It is useful provisional
-evidence, but it is deliberately not release approval; a clean-commit rerun and explicit memory
-decision remain required.
+Both the provisional and subsequent clean-commit August runs exceeded all three RSS gates.
+Alpha.2 addresses the measured cause: compiler heaps remained resident across units and through
+serialization. Default scans now run each compiler unit in a sequential worker and wait for its
+exit before continuing. Only normalized records return to the coordinator. The worker uses
+TypeScript's type-information JSDoc mode, which preserves JavaScript JSDoc types; the scanner does
+not expose TypeScript JSDoc prose or semantic link diagnostics. Custom pipelines keep their original
+in-process execution and full JSDoc access. No semantic inputs or artifact checks are removed.
+
+The reviewed [alpha.2 release benchmark](../benchmarks/results/release-alpha-2-2026-11-01.md)
+records the clean-commit results, unchanged thresholds, dependency caveats, and release decision.
 
 Heuristic/unresolved relations keep inverse records for graph traversal but remain identifiable from
 either endpoint and are excluded from future default compact context unless explicitly requested.

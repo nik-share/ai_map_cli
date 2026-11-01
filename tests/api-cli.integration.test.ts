@@ -2,6 +2,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
+import packageJson from "../package.json" with { type: "json" };
 
 import {
   checkFreshness,
@@ -90,6 +91,12 @@ describe("programmatic API", () => {
 });
 
 describe("CLI observable behavior", () => {
+  it("reports the package release version", async () => {
+    const result = await runCli(["--version"]);
+    expect(result.code, result.stderr).toBe(0);
+    expect(result.stdout.trim()).toBe(packageJson.version);
+  });
+
   it("supports init, scan, show, and check from a nested directory with machine-readable output", async () => {
     const root = await fixture("typescript-node");
     const init = await runCli(["init", "--root", root]);

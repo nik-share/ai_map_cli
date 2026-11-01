@@ -23,12 +23,14 @@ import {
 } from "./utils/path.js";
 import { compareText } from "./utils/stable.js";
 
-export const TYPESCRIPT_SEMANTIC_VERSION = `compiler-units-v3+typescript-${ts.version}`;
+export const TYPESCRIPT_SEMANTIC_VERSION = `compiler-units-v4+typescript-${ts.version}`;
 
 /** TypeScript remains authoritative for all TypeScript/JavaScript semantic facts. */
 export class TypeScriptSemanticResolver implements SemanticResolver {
   readonly name = "typescript-program";
   readonly version = TYPESCRIPT_SEMANTIC_VERSION;
+
+  constructor(private readonly jsDocParsingMode = ts.JSDocParsingMode.ParseAll) {}
 
   resolve(input: SemanticResolveInput): SemanticResolution {
     const compiler = loadCompilerConfiguration(input.root, input.tsconfig);
@@ -43,6 +45,8 @@ export class TypeScriptSemanticResolver implements SemanticResolver {
       fileSystem,
       compiler.parsedCommands,
     );
+    // Built-in scans need type evidence; public/custom resolvers retain full JSDoc by default.
+    host.jsDocParsingMode = this.jsDocParsingMode;
     const cache = ts.createModuleResolutionCache(
       currentDirectory,
       (fileName) => host.getCanonicalFileName(fileName),

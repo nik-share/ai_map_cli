@@ -38,6 +38,7 @@ import type {
   SyntaxParseResult,
 } from "../src/index.js";
 import { BoundedTypeScriptFileSystem } from "../src/compiler-units.js";
+import * as compilerWorker from "../src/compiler-worker-client.js";
 import { stableJson } from "../src/utils/stable.js";
 import { readPersistedMap, removeProject } from "./helpers.js";
 
@@ -1992,17 +1993,17 @@ describe("Milestone 1.1 semantic correctness and freshness", () => {
     expect(spoofResolve).toHaveBeenCalled();
     expect(custom.wrote).toBe(true);
 
-    const builtInResolve = vi.spyOn(TypeScriptSemanticResolver.prototype, "resolve");
+    const builtInAnalysis = vi.spyOn(compilerWorker, "runCompilerUnitWorker");
     const restoredDefault = await scanProject({ root });
-    expect(builtInResolve).toHaveBeenCalled();
+    expect(builtInAnalysis).toHaveBeenCalled();
     expect(restoredDefault.wrote).toBe(true);
     expect((await checkFreshness({ root })).current).toBe(true);
 
-    builtInResolve.mockClear();
+    builtInAnalysis.mockClear();
     const beforeExactParser = await readPersistedMap(root);
     const exactParser = await scanProject({ root, parser: new TypeScriptParserAdapter() });
     expect(exactParser.wrote).toBe(false);
-    expect(builtInResolve).not.toHaveBeenCalled();
+    expect(builtInAnalysis).not.toHaveBeenCalled();
     const afterExactParser = await readPersistedMap(root);
     expect(Object.keys(afterExactParser.raw).sort()).toEqual(
       Object.keys(beforeExactParser.raw).sort(),
@@ -2042,16 +2043,18 @@ describe("Milestone 1.1 semantic correctness and freshness", () => {
         return undefined;
       },
     });
-    builtInResolve.mockClear();
+    builtInAnalysis.mockClear();
+    const customResolve = vi.spyOn(TypeScriptSemanticResolver.prototype, "resolve");
     const proxiedParser = await scanProject({ root, parser: parserProxy });
     expect(proxiedParser.wrote).toBe(true);
     expect(proxiedParser.map.manifest.producer.kind).toBe("custom");
-    expect(builtInResolve).toHaveBeenCalled();
+    expect(customResolve).toHaveBeenCalled();
+    expect(proxiedParser.map.symbols).toEqual(restoredDefault.map.symbols);
 
-    builtInResolve.mockClear();
+    builtInAnalysis.mockClear();
     const restoredAfterProxy = await scanProject({ root });
     expect(restoredAfterProxy.wrote).toBe(true);
-    expect(builtInResolve).toHaveBeenCalled();
+    expect(builtInAnalysis).toHaveBeenCalled();
     expect((await checkFreshness({ root })).current).toBe(true);
 
     const spoofParserInputs: SyntaxParseInput[] = [];
@@ -2065,9 +2068,9 @@ describe("Milestone 1.1 semantic correctness and freshness", () => {
     expect(spoofParserInputs.length).toBeGreaterThan(0);
     expect(customParser.wrote).toBe(true);
 
-    builtInResolve.mockClear();
+    builtInAnalysis.mockClear();
     const restoredAfterParser = await scanProject({ root });
-    expect(builtInResolve).toHaveBeenCalled();
+    expect(builtInAnalysis).toHaveBeenCalled();
     expect(restoredAfterParser.wrote).toBe(true);
     expect((await checkFreshness({ root })).current).toBe(true);
 
@@ -2082,9 +2085,9 @@ describe("Milestone 1.1 semantic correctness and freshness", () => {
     expect(overriddenParserInputs.length).toBeGreaterThan(0);
     expect(customInstance.wrote).toBe(true);
 
-    builtInResolve.mockClear();
+    builtInAnalysis.mockClear();
     const restoredAfterInstanceOverride = await scanProject({ root });
-    expect(builtInResolve).toHaveBeenCalled();
+    expect(builtInAnalysis).toHaveBeenCalled();
     expect(restoredAfterInstanceOverride.wrote).toBe(true);
     expect((await checkFreshness({ root })).current).toBe(true);
 
@@ -2096,29 +2099,29 @@ describe("Milestone 1.1 semantic correctness and freshness", () => {
     semanticInputsTamper.semanticInputs = [];
     await writeFile(manifestPath, `${JSON.stringify(semanticInputsTamper, null, 2)}\n`);
     expect((await checkFreshness({ root })).current).toBe(false);
-    builtInResolve.mockClear();
+    builtInAnalysis.mockClear();
     const repairedSemanticInputs = await scanProject({ root });
     expect(repairedSemanticInputs.wrote).toBe(true);
-    expect(builtInResolve).toHaveBeenCalled();
+    expect(builtInAnalysis).toHaveBeenCalled();
     expect((await checkFreshness({ root })).current).toBe(true);
 
     const producerTamper = JSON.parse(await readFile(manifestPath, "utf8")) as CodeMap["manifest"];
     producerTamper.producer.fingerprint = "0".repeat(64);
     await writeFile(manifestPath, `${JSON.stringify(producerTamper, null, 2)}\n`);
     expect((await checkFreshness({ root })).current).toBe(false);
-    builtInResolve.mockClear();
+    builtInAnalysis.mockClear();
     const repairedProducer = await scanProject({ root });
     expect(repairedProducer.wrote).toBe(true);
-    expect(builtInResolve).toHaveBeenCalled();
+    expect(builtInAnalysis).toHaveBeenCalled();
     expect((await checkFreshness({ root })).current).toBe(true);
 
-    builtInResolve.mockClear();
+    builtInAnalysis.mockClear();
     const projectPath = join(root, ".ai/code-map/project.json");
     await writeFile(projectPath, ` \n${await readFile(projectPath, "utf8")}`);
     expect((await checkFreshness({ root })).current).toBe(false);
     const repaired = await scanProject({ root });
     expect(repaired.wrote).toBe(true);
-    expect(builtInResolve).toHaveBeenCalled();
+    expect(builtInAnalysis).toHaveBeenCalled();
     await expect(loadCodeMap({ root })).resolves.toEqual(repaired.map);
   });
 });

@@ -3,6 +3,7 @@
 import { pathToFileURL } from "node:url";
 
 import { Command, CommanderError, Option } from "commander";
+import packageJson from "../package.json" with { type: "json" };
 
 import { initProject } from "./config.js";
 import { CodeMapError, errorMessage } from "./errors.js";
@@ -130,7 +131,7 @@ function createProgram(): Command {
     .description(
       "Generate a deterministic local semantic map of TypeScript and JavaScript projects",
     )
-    .version("0.1.0")
+    .version(packageJson.version)
     .showHelpAfterError()
     .addOption(new Option("--debug", "show stack traces for failures").hideHelp());
 }

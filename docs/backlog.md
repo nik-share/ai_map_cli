@@ -17,7 +17,7 @@
 
 1. Add a deterministic, structured query API with strict output budgets, ranking, truncation, and omission accounting.
 2. Compare compact map context with relevant source slices and return the smaller useful representation.
-3. Profile and reduce peak memory on the three representative repositories before release approval.
+3. Keep the alpha.2 peak-memory regression gates while expanding query capabilities.
 4. Mature and independently validate the existing experimental Next.js and NestJS analyzers before enabling either by default.
 5. Run the parser evaluation corpus on representative repositories and supported CI platforms; decide whether ast-grep stays dev-only, becomes optional, or becomes a default candidate observer.
 6. Add accuracy fixtures and precision/recall reporting for framework rule packs.

@@ -57,6 +57,7 @@ import {
   TypeScriptSemanticResolver,
 } from "./semantic.js";
 import type { CompilerUnitPlan } from "./compiler-units.js";
+import { runCompilerUnitWorker } from "./compiler-worker-client.js";
 
 interface PreparedSource {
   absolutePath: string;
@@ -166,21 +167,44 @@ export async function analyzeProject(options: AnalyzeProjectOptions): Promise<Co
   const unitAliases = new Map<string, Record<string, string[]>>();
   const observedSemanticInputs: SemanticInputObservation[] = [];
 
-  // Programs are intentionally scoped to one owning unit and processed sequentially.
+  const builtInProducer =
+    !options.semanticResolver &&
+    !options.analyzers &&
+    (!options.parser || isBuiltInTypeScriptParserAdapter(options.parser));
+
+  // A completed worker releases its compiler heap before the next unit or serialization.
   for (const unit of compilerGraph.units) {
     if (unit.ownedFiles.length === 0) continue;
-    const contribution = await analyzeCompilerUnit({
+    const unitInput: CompilerWorkerInput = {
       unit,
       root: resolved.root,
       packageDependencies: packageMetadata.dependencies,
       includePrivateSymbols: resolved.config.includePrivateSymbols,
       selectedFrameworks,
-      preparedByAbsolute,
+      preparedByAbsolute: new Map(
+        unit.ownedFiles.flatMap((absolute) => {
+          const source = preparedByAbsolute.get(absolute);
+          return source ? [[absolute, source] as const] : [];
+        }),
+      ),
       indexedSourcePaths,
-      analyzers,
-      trustedInternalAnalyzers,
-      semanticResolver,
-    });
+    };
+    let contribution: CompilerUnitContribution;
+    if (builtInProducer) {
+      const result = await runCompilerUnitWorker(unitInput);
+      contribution = result.contribution;
+      for (const file of result.files) {
+        const source = preparedByAbsolute.get(path.resolve(resolved.root, file.path));
+        if (source) source.file = file;
+      }
+    } else {
+      contribution = await analyzeCompilerUnit({
+        ...unitInput,
+        analyzers,
+        trustedInternalAnalyzers,
+        semanticResolver,
+      });
+    }
     unitAliases.set(unit.record.id, contribution.pathAliases);
     diagnostics.push(...contribution.diagnostics);
     symbols.push(...contribution.symbols);
@@ -236,10 +260,6 @@ export async function analyzeProject(options: AnalyzeProjectOptions): Promise<Co
       }))
       .sort((a, b) => compareText(a.name, b.name)),
   };
-  const builtInProducer =
-    !options.semanticResolver &&
-    !options.analyzers &&
-    (!options.parser || isBuiltInTypeScriptParserAdapter(options.parser));
   const project: ProjectRecord = {
     schemaVersion: SCHEMA_VERSION,
     name: sanitizePersistedText(packageMetadata.name, resolved.root),
@@ -312,6 +332,34 @@ interface CompilerUnitContribution {
   symbols: SymbolRecord[];
   relations: RelationRecord[];
   semanticInputs: SemanticInputObservation[];
+}
+
+export type CompilerWorkerInput = Omit<
+  AnalyzeCompilerUnitOptions,
+  "analyzers" | "trustedInternalAnalyzers" | "semanticResolver"
+>;
+
+export interface CompilerWorkerResult {
+  contribution: CompilerUnitContribution;
+  files: FileRecord[];
+}
+
+export async function analyzeDefaultCompilerUnit(
+  input: CompilerWorkerInput,
+): Promise<CompilerWorkerResult> {
+  const pipeline = defaultAnalyzerPipeline();
+  const contribution = await analyzeCompilerUnit({
+    ...input,
+    analyzers: pipeline.analyzers,
+    trustedInternalAnalyzers: pipeline.methods,
+    // We expose type facts and syntactic diagnostics, not TS JSDoc link diagnostics or prose.
+    // This mode still parses all JavaScript JSDoc, which can define types.
+    semanticResolver: new TypeScriptSemanticResolver(ts.JSDocParsingMode.ParseForTypeInfo),
+  });
+  return {
+    contribution,
+    files: [...input.preparedByAbsolute.values()].map((source) => source.file),
+  };
 }
 
 async function analyzeCompilerUnit(
