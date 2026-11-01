@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 2026-11-01
+
+### 0.1.0-alpha.3
+
+- Add bounded `context` / `buildSourceContext` packets with current source, direct symbol links, file-level references, and up to four small outgoing dependencies.
+- Add a reproducible token benchmark with fixed budgets, raw usage accounting, and manual paired quality review; accept recursive map exclusions in search commands.
+- Token savings remain experimental: the latest 12-attempt, three-project comparison saved 0.9% overall and failed two paired quality comparisons. This release does not claim savings above 10% or quality non-degradation.
+
 - Add `map` to check freshness and return the complete structural graph in one call, with short references and grouped relation counts.
 
 - Include bounded direct symbol links and test call sites on the first `read` page, with reusable IDs and omission counts.
