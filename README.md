@@ -1,6 +1,8 @@
 # AI Code Map
 
-AI Code Map is a local, deterministic code understanding layer for TypeScript, JavaScript, and React projects. It analyzes source files into stable symbols, relations, and diagnostics so AI coding agents can plan with a compact, trustworthy index before opening many files.
+AI Code Map is a local CLI for navigating TypeScript, JavaScript, and React code. It indexes symbols and their relations, then returns relevant source ranges for an AI coding agent. Run it in your project; no server, account, API key, or hosted database is needed for normal use.
+
+[Install from npm](https://www.npmjs.com/package/ai-code-map) · [Changelog](./CHANGELOG.md) · [API documentation](./docs/api.md)
 
 ## Key properties (alpha scope)
 
@@ -9,29 +11,59 @@ AI Code Map is a local, deterministic code understanding layer for TypeScript, J
 - **Compiler-authoritative**: TypeScript compiler is the trusted semantic layer for symbols, references, imports, and types.
 - **Evidence-backed facts**: relations carry a source range, analyzer, classification, and confidence; source code remains authoritative.
 - **No network/telemetry by default**: no outbound upload is part of a standard scan.
-- **Small CLI**: `init`, `scan`, `check`, `find`, `show`.
+- **Bounded source reads**: `context` collects related source; `find`, `read`, and `show` support focused follow-up. `map` prints the full structural graph when needed.
 
 ## Quick start
 
+Requires Node.js 22 or newer. Run these commands from your project root:
+
 ```bash
-pnpm install
+pnpm add -D ai-code-map
 pnpm exec ai-code-map init
 pnpm exec ai-code-map scan
-pnpm exec ai-code-map check
-pnpm exec ai-code-map find "calculator"
-pnpm exec ai-code-map show Calculator
+pnpm exec ai-code-map context "your feature or function name"
 ```
+
+For a project that uses npm, install with `npm install --save-dev ai-code-map` and
+replace `pnpm exec` with `npx`. Installation downloads the package; scanning and
+navigation operate on local files. The commands do not start a background service.
+
+The map stays in `.ai/code-map`. `context` checks freshness automatically; if it
+returns exit code 2, run `scan` again. For a narrower lookup:
+
+```bash
+pnpm exec ai-code-map check
+pnpm exec ai-code-map find "function name"
+pnpm exec ai-code-map read '<stable ID returned by find>'
+```
+
+Reuse returned source and IDs. Follow only a specific missing dependency instead
+of loading the whole map into the agent's context. Use `show '<stable ID>'` when
+you need relation details.
+
+### Token savings are experimental
+
+Version `0.1.0-alpha.3` adds combined source context and small dependency reads.
+The latest fixed comparison ran 12 attempts across three projects: total model
+token use fell by **0.9%**, and two of six paired answers scored lower for quality.
+Savings above 10% and quality non-degradation are **not established**. Results vary
+by task and model; bounded output alone does not guarantee lower total token use.
+
+The optional developer token benchmark calls a model and consumes tokens. It is
+separate from normal local CLI use and does not run during installation or scanning.
 
 ### Exit codes
 
-| Command | Success                   | Failure behavior                                           |
-| ------- | ------------------------- | ---------------------------------------------------------- |
-| `init`  | `0`                       | invalid configuration or environment errors -> `1`         |
-| `scan`  | `0`                       | parser errors with `--strict` -> `3`, otherwise `0`        |
-| `check` | `0` when current          | stale map -> `2`, missing map -> `2`                       |
-| `map`   | `0` when current          | stale, missing, or invalid map -> `2`; other errors -> `1` |
-| `show`  | `0`                       | no match -> `1`                                            |
-| `find`  | `0`, including no matches | invalid query or limit -> `1`                              |
+| Command   | Success                   | Failure behavior                                           |
+| --------- | ------------------------- | ---------------------------------------------------------- |
+| `init`    | `0`                       | invalid configuration or environment errors -> `1`         |
+| `scan`    | `0`                       | parser errors with `--strict` -> `3`, otherwise `0`        |
+| `check`   | `0` when current          | stale map -> `2`, missing map -> `2`                       |
+| `map`     | `0` when current          | stale, missing, or invalid map -> `2`; other errors -> `1` |
+| `show`    | `0`                       | no match -> `1`                                            |
+| `find`    | `0`, including no matches | invalid query or limit -> `1`                              |
+| `read`    | `0`                       | invalid ID or source validation error -> `1`               |
+| `context` | `0`                       | stale, missing, or invalid map -> `2`; other errors -> `1` |
 
 ## CLI command matrix
 
@@ -325,7 +357,7 @@ Freshness compares:
 
 ## Known limitations
 
-- CLI is intentionally alpha: only `init`, `scan`, `check`, and `show`.
+- The CLI remains alpha; command output and APIs may change between releases. Large TypeScript compiler units can still require significant memory.
 - No source execution, no dynamic config loading, no project remote ingestion.
 - `show` is a single-symbol query, not a full search/index query language.
 - `Next.js` and `NestJS` analyzers are exported and available programmatically but are **experimental and default-off** in CLI because they are not in the default analyzer list.
@@ -343,8 +375,8 @@ Use this with your agent context:
 
 Use the Code Map as a navigation index, not as a replacement for source. Start with `ai-code-map init` then `ai-code-map scan`; do not upload map output and do not read every `.ai/code-map` artifact automatically. For each change:
 
-1. Inspect symbols via `ai-code-map show <id|kind:name|name> --json`.
-2. Read only the files and symbols directly connected through relations.
+1. Run `ai-code-map context "task words"` for a bounded source packet. If the map is stale, run `scan`.
+2. Reuse returned IDs and source. Use `find`, `read`, or `show` only for a specific remaining question.
 3. Keep decisions tied to map evidence and confidence; do not assume behavior beyond relation origin lines.
 4. Open and verify the authoritative source before editing.
 5. Before finalizing, run `ai-code-map check` to verify no stale output changes.
@@ -353,8 +385,8 @@ Use the Code Map as a navigation index, not as a replacement for source. Start w
 
 Используйте Code Map как навигационный индекс, а не замену исходному коду. Выполните `ai-code-map init`, затем `ai-code-map scan`; не отправляйте артефакты наружу и не читайте автоматически все файлы `.ai/code-map`. Для каждого изменения:
 
-1. Смотрите символы через `ai-code-map show <id|kind:name|name> --json`.
-2. Открывайте только файлы и связи, которые действительно относятся к выбранным символам.
+1. Получите нужные исходники через `ai-code-map context "слова задачи"`. Если карта устарела, выполните `scan`.
+2. Используйте уже полученные ID и исходники. Вызывайте `find`, `read` или `show` только для оставшегося конкретного вопроса.
 3. Проверяйте решения по доказательствам из артефактов и уровню `confidence`; не делайте предположений без этих данных.
 4. Перед изменением откройте и проверьте исходный код как главный источник истины.
 5. Перед завершением выполните `ai-code-map check`, чтобы убедиться, что карта актуальна.
