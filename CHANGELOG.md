@@ -4,6 +4,17 @@
 
 ## 2026-11-01
 
+### 0.1.0-alpha.4
+
+- Automatically select the experimental Next.js analyzer when `frameworks: ["auto"]` detects a `next` dependency. Explicit framework lists can enable or disable it.
+- Support `src/app` and `src/pages`, including page-to-layout links.
+- Recognize exported HTTP handlers from destructuring, aliases, re-exports, and wrappers. Exclude local functions and type-only exports from HTTP methods.
+- Index destructured variable bindings and resolve calls to exported handlers.
+- Recognize wrapped default exports and root or `src` middleware files.
+- Update analyzer versions so existing maps require a rescan. Token savings were not remeasured for this release.
+
+## 2026-11-01
+
 ### 0.1.0-alpha.3
 
 - Add bounded `context` / `buildSourceContext` packets with current source, direct symbol links, file-level references, and up to four small outgoing dependencies.
