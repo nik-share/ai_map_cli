@@ -9,7 +9,7 @@ AI Code Map is a local, deterministic code understanding layer for TypeScript, J
 - **Compiler-authoritative**: TypeScript compiler is the trusted semantic layer for symbols, references, imports, and types.
 - **Evidence-backed facts**: relations carry a source range, analyzer, classification, and confidence; source code remains authoritative.
 - **No network/telemetry by default**: no outbound upload is part of a standard scan.
-- **Small CLI**: `init`, `scan`, `check`, `show`.
+- **Small CLI**: `init`, `scan`, `check`, `find`, `show`.
 
 ## Quick start
 
@@ -18,17 +18,19 @@ pnpm install
 pnpm exec ai-code-map init
 pnpm exec ai-code-map scan
 pnpm exec ai-code-map check
+pnpm exec ai-code-map find "calculator"
 pnpm exec ai-code-map show Calculator
 ```
 
 ### Exit codes
 
-| Command | Success          | Failure behavior                                    |
-| ------- | ---------------- | --------------------------------------------------- |
-| `init`  | `0`              | invalid configuration or environment errors -> `1`  |
-| `scan`  | `0`              | parser errors with `--strict` -> `3`, otherwise `0` |
-| `check` | `0` when current | stale map -> `2`, missing map -> `2`                |
-| `show`  | `0`              | no match -> `1`                                     |
+| Command | Success                   | Failure behavior                                    |
+| ------- | ------------------------- | --------------------------------------------------- |
+| `init`  | `0`                       | invalid configuration or environment errors -> `1`  |
+| `scan`  | `0`                       | parser errors with `--strict` -> `3`, otherwise `0` |
+| `check` | `0` when current          | stale map -> `2`, missing map -> `2`                |
+| `show`  | `0`                       | no match -> `1`                                     |
+| `find`  | `0`, including no matches | invalid query or limit -> `1`                       |
 
 ## CLI command matrix
 
@@ -68,7 +70,29 @@ Displays indexed symbol(s) by:
 - `path` or `path#name`
 - exact symbol name
 
-Shows symbol details plus inbound/outbound relation IDs and confidence.
+Default text is compact: up to five symbols, full source ranges, signatures capped at 240
+characters, and up to 12 relation groups across the response. Repeated relations of the same
+direction, type, and endpoint are grouped with occurrence counts. Internal links come first.
+Heuristic/unresolved relations, derived inverse links, containment/export edges, and references
+that duplicate a more specific relation are filtered. Each symbol reports shown/omitted groups
+and filtered record counts. Documentation and facts are available in the full view.
+
+- `--limit <1..50>` changes the total relation-group limit for compact text.
+- `--full` preserves the previous verbose text view.
+- `--json` preserves the complete `ShowResult`, including all relation evidence.
+
+These are row and signature limits, not a token budget. A failed selector suggests up to five
+indexed candidates; it never silently selects a different symbol.
+
+### `ai-code-map find <query>`
+
+Searches indexed symbol names and paths. Quote multiword queries, for example
+`ai-code-map find "manager change"`. Exact names/IDs rank first, followed by prefix/substring,
+word matches, and bounded typo matching. This is lexical search, not semantic search.
+
+Results include stable IDs usable by `show`, kinds, and full source ranges. The default is ten
+matches; `--limit <1..50>` adjusts this. `--json` returns `{ query, total, truncated, matches }`.
+No matches is a successful empty search. Use `rg` for source text or symbols outside the index.
 
 ## Generated artifacts
 

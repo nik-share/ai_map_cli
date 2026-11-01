@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Add compact text `show` with full source ranges, grouped relations, and explicit omission counts.
+- Preserve verbose output through `show --full` and complete records through `show --json`.
+- Add `find` / `findSymbols` for bounded symbol discovery and typo suggestions on failed `show` selectors.
+
 ## 2026-11-01
 
 ### 0.1.0-alpha.2

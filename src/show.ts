@@ -73,7 +73,94 @@ export function showSymbol(map: CodeMap, selector: string): ShowResult {
   };
 }
 
-export function formatShowResult(result: ShowResult): string {
+export interface ShowFormatOptions {
+  /** Preserve the verbose text view. JSON and showSymbol always retain full records. */
+  full?: boolean;
+  /** Total relation groups across the compact view; integer 1..50, default 12. */
+  limit?: number;
+}
+
+export function formatShowResult(result: ShowResult, options: ShowFormatOptions = {}): string {
+  const limit = options.limit ?? 12;
+  if (!Number.isInteger(limit) || limit < 1 || limit > 50) {
+    throw new RangeError("show limit must be an integer between 1 and 50");
+  }
+  if (options.full) return formatFullShowResult(result);
+  let remaining = limit;
+  const matches = result.matches.slice(0, 5);
+  const blocks = matches.map(({ symbol, inbound, outbound }) => {
+    const { startLine, startColumn, endLine, endColumn } = symbol.range;
+    const lines = [
+      `${symbol.name} [${symbol.kind}]`,
+      `id: ${symbol.id}`,
+      `path: ${symbol.file}:${startLine}:${startColumn}-${endLine}:${endColumn}`,
+    ];
+    if (symbol.signature) {
+      const signature = symbol.signature.replace(/\s+/g, " ");
+      lines.push(
+        `signature: ${signature.length > 240 ? `${signature.slice(0, 240)}… [truncated]` : signature}`,
+      );
+    }
+    const entries = [
+      ...outbound.map((relation) => ({ relation, direction: "->", target: relation.to })),
+      ...inbound.map((relation) => ({ relation, direction: "<-", target: relation.from })),
+    ];
+    const eligible = entries.filter(
+      ({ relation, target }) =>
+        !["heuristic", "derived"].includes(relation.origin.classification) &&
+        !["contains", "exports", "used-by"].includes(relation.type) &&
+        !target.startsWith("unresolved:"),
+    );
+    const actionable = new Set(
+      eligible
+        .filter(({ relation }) => relation.type !== "references")
+        .map(({ direction, target }) => `${direction}:${target}`),
+    );
+    const groups = new Map<
+      string,
+      { direction: string; target: string; type: string; count: number }
+    >();
+    let filtered = entries.length - eligible.length;
+    for (const { relation, direction, target } of eligible) {
+      if (relation.type === "references" && actionable.has(`${direction}:${target}`)) {
+        filtered++;
+        continue;
+      }
+      const key = `${direction}:${relation.type}:${target}`;
+      const group = groups.get(key);
+      if (group) group.count++;
+      else groups.set(key, { direction, target, type: relation.type, count: 1 });
+    }
+    const ranked = [...groups.values()].sort(
+      (a, b) =>
+        Number(a.target.startsWith("external:")) - Number(b.target.startsWith("external:")) ||
+        Number(a.type === "references") - Number(b.type === "references") ||
+        compareText(`${a.direction}:${a.type}:${a.target}`, `${b.direction}:${b.type}:${b.target}`),
+    );
+    const shown = ranked.slice(0, remaining);
+    remaining -= shown.length;
+    lines.push(
+      `relations: ${shown.length}/${ranked.length} groups shown; ${ranked.length - shown.length} omitted; ${filtered} records filtered`,
+    );
+    lines.push(
+      ...shown.map(
+        ({ direction, type, target, count }) =>
+          `  ${direction} ${type} ${direction} ${target}${count > 1 ? ` (${count} occurrences)` : ""}`,
+      ),
+    );
+    return lines.join("\n");
+  });
+  if (matches.length < result.matches.length) {
+    blocks.push(
+      `Symbols: ${matches.length}/${result.matches.length} shown; ${result.matches.length - matches.length} omitted. Use an exact ID to narrow the selector.`,
+    );
+  }
+  if (matches.length)
+    blocks.push("Compact view; use --full or --json for all details and evidence.");
+  return blocks.join("\n\n");
+}
+
+function formatFullShowResult(result: ShowResult): string {
   return result.matches
     .map(({ symbol, inbound, outbound }) => {
       const lines = [

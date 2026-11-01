@@ -6,6 +6,9 @@ export { scanProject, createAnalyzer } from "./scan.js";
 export { loadCodeMap, buildOverview, computeManifestIntegrityHash } from "./storage.js";
 export { checkFreshness } from "./freshness.js";
 export { showSymbol, formatShowResult } from "./show.js";
+export type { ShowFormatOptions } from "./show.js";
+export { findSymbols } from "./search.js";
+export type { SymbolSearchResult, SymbolSearchOptions, SymbolSearchMatch } from "./search.js";
 export {
   FallbackParserAdapter,
   TypeScriptParserAdapter,

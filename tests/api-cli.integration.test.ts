@@ -91,6 +91,41 @@ describe("programmatic API", () => {
 });
 
 describe("CLI observable behavior", () => {
+  it("finds usable selectors, suggests typos, and supports compact/full show without changing JSON", async () => {
+    const root = await fixture("typescript-node");
+    await scanProject({ root });
+    const map = await loadCodeMap({ root });
+    const calculator = symbolNamed(map, "Calculator");
+    const found = await runCli(["find", "calcul", "--root", root, "--limit", "1", "--json"]);
+    expect(found.code, found.stderr).toBe(0);
+    expect(parseCliJson(found)).toMatchObject({
+      matches: [{ id: calculator.id }],
+    });
+    const readable = await runCli(["find", "Calculator", "--root", root]);
+    expect(readable.stdout).toContain(calculator.id);
+    expect(readable.stdout).toContain(`src/service.ts:${calculator.range.startLine}`);
+    const compact = await runCli(["show", calculator.id, "--root", root, "--limit", "1"]);
+    expect(compact.code, compact.stderr).toBe(0);
+    expect(compact.stdout).toContain("Compact view");
+    expect(compact.stdout).toContain(`-${calculator.range.endLine}:${calculator.range.endColumn}`);
+    const full = await runCli(["show", calculator.id, "--root", root, "--full"]);
+    expect(full.code, full.stderr).toBe(0);
+    expect(full.stdout).toContain("exported: true");
+    const json = await runCli(["show", calculator.id, "--root", root, "--json"]);
+    expect(parseCliJson(json)).toEqual(showSymbol(map, calculator.id));
+    const typo = await runCli(["show", "Calculatr", "--root", root]);
+    expect(typo.code).toBe(1);
+    expect(typo.stderr).toContain("Did you mean");
+    expect(typo.stderr).toContain(calculator.id);
+    expect(typo.stderr).not.toContain("Run ai-code-map scan");
+    const missing = await runCli(["find", "zzzzzzzzzzzz", "--root", root, "--json"]);
+    expect(missing.code).toBe(0);
+    expect(parseCliJson(missing)).toMatchObject({ total: 0, matches: [] });
+    const invalid = await runCli(["find", "Calculator", "--root", root, "--limit", "2x"]);
+    expect(invalid.code).toBe(1);
+    expect(invalid.stderr).toContain("integer between 1 and 50");
+  }, 60_000);
+
   it("reports the package release version", async () => {
     const result = await runCli(["--version"]);
     expect(result.code, result.stderr).toBe(0);
@@ -152,7 +187,7 @@ describe("CLI observable behavior", () => {
   }, 60_000);
 
   it("provides help for every public command", async () => {
-    for (const command of ["init", "scan", "check", "show"]) {
+    for (const command of ["init", "scan", "check", "show", "find"]) {
       const result = await runCli([command, "--help"]);
       expect(result.code, `${command}: ${result.stderr}`).toBe(0);
       expect(result.stdout).toContain("--root");

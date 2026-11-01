@@ -33,6 +33,17 @@ one-sided coherent corruption; a rescan is required.
   - computes the canonical code-point-ordered manifest integrity hash used by persistence and tests
 - `showSymbol(map, selector) -> ShowResult`
   - selectors: exact ID, `kind:name`, `path#name`, exact name/path
+  - returns all matching symbols and full relation records; no display filtering
+- `formatShowResult(result, options?) -> string`
+  - compact by default: up to five symbols and 12 relation groups in total, with omission counts
+  - options: `{ full?: boolean, limit?: number }`; `limit` is an integer 1..50
+  - `{ full: true }` preserves the previous verbose text view
+- `findSymbols(map, query, options?) -> SymbolSearchResult`
+  - searches indexed names and paths; returns stable IDs and source ranges
+  - options: `{ limit?: number }`, default 10, integer 1..50; invalid limits throw `RangeError`
+  - empty/whitespace query throws; no matches returns an empty array
+  - returns `{ query, total, truncated, matches: [{ id, name, kind, file, range }] }`
+  - deterministic lexical ranking and bounded typo hints; does not resolve guessed names as exact symbols
 
 ## Analyzer constructors
 
@@ -68,7 +79,8 @@ The package exports major record/contract types including:
 - `CodeMap`, `CodeMapConfig`, `ManifestRecord`, `ProjectRecord`
 - `FileRecord`, `SymbolRecord`, `RelationRecord`, `DiagnosticRecord`
 - `CompilerUnitRecord`, `ProducerRecord`, `SemanticInputRecord`, `ArtifactIntegrityRecord`
-- `ScanResult`, `FreshnessResult`, `ShowResult`
+- `ScanResult`, `FreshnessResult`, `ShowResult`, `ShowFormatOptions`
+- `SymbolSearchResult`, `SymbolSearchOptions`, `SymbolSearchMatch`
 - `ScanOptions`, `LoadCodeMapOptions`, `AnalysisContext`
 
 ## Example

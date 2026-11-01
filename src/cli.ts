@@ -9,6 +9,7 @@ import { initProject } from "./config.js";
 import { CodeMapError, errorMessage } from "./errors.js";
 import { checkFreshness } from "./freshness.js";
 import { scanProject } from "./scan.js";
+import { findSymbols, type SymbolSearchResult } from "./search.js";
 import { formatShowResult, showSymbol } from "./show.js";
 import { loadCodeMap } from "./storage.js";
 import type { LoadCodeMapOptions } from "./types.js";
@@ -88,24 +89,51 @@ export async function runCli(argv = process.argv): Promise<number> {
     });
   addCommonOptions(checkCommand);
 
+  const findCommand = program
+    .command("find")
+    .description("Find indexed symbols by name, path, words, or a likely typo")
+    .argument("<query>", "search query (quote multiple words)")
+    .option("--limit <number>", "maximum matches, 1..50", parseLimit, 10)
+    .option("--json", "print machine-readable output")
+    .action(
+      async (query: string, options: CommonCliOptions & { limit: number }, command: Command) => {
+        const map = await loadCodeMap(loadOptions(collectOptions(command)));
+        const result = findSymbols(map, query, { limit: options.limit });
+        if (options.json) printJson(result);
+        else process.stdout.write(`${formatSearchResult(result)}\n`);
+      },
+    );
+  addCommonOptions(findCommand);
+
   const showCommand = program
     .command("show")
     .description("Show one indexed symbol by stable ID, kind:name, path, or exact name")
     .argument("<symbol>", "symbol selector")
+    .option("--full", "print verbose symbol details and relations")
+    .option("--limit <number>", "maximum relation groups in compact text, 1..50", parseLimit, 12)
     .addOption(new Option("--json", "print machine-readable output"))
-    .action(async (selector: string, _options: CommonCliOptions, command: Command) => {
-      const common = collectOptions(command);
-      const map = await loadCodeMap(loadOptions(common));
-      const result = showSymbol(map, selector);
-      if (result.matches.length === 0) {
-        throw new CodeMapError(
-          "SYMBOL_NOT_FOUND",
-          `No indexed symbol matches ${selector}. Run ai-code-map scan, then use an exact name or stable ID.`,
-        );
-      }
-      if (common.json) printJson(result);
-      else process.stdout.write(`${formatShowResult(result)}\n`);
-    });
+    .action(
+      async (
+        selector: string,
+        options: CommonCliOptions & { full?: boolean; limit: number },
+        command: Command,
+      ) => {
+        const common = collectOptions(command);
+        const map = await loadCodeMap(loadOptions(common));
+        const result = showSymbol(map, selector);
+        if (result.matches.length === 0) {
+          const suggestions = selector.trim()
+            ? findSymbols(map, selector, { limit: 5 })
+            : undefined;
+          throw new CodeMapError(
+            "SYMBOL_NOT_FOUND",
+            `No indexed symbol matches ${selector}. ${suggestions?.matches.length ? `Did you mean:\n${formatSearchResult(suggestions)}` : 'Use ai-code-map find "words" to discover a selector, or rg if the symbol is not indexed.'}`,
+          );
+        }
+        if (common.json) printJson(result);
+        else process.stdout.write(`${formatShowResult(result, { ...options })}\n`);
+      },
+    );
   addCommonOptions(showCommand);
 
   try {
@@ -158,6 +186,27 @@ function loadOptions(options: CommonCliOptions): LoadCodeMapOptions {
 
 function printJson(value: unknown): void {
   process.stdout.write(`${JSON.stringify(value, null, 2)}\n`);
+}
+
+function parseLimit(value: string): number {
+  const limit = Number(value);
+  if (!/^\d+$/.test(value) || !Number.isInteger(limit) || limit < 1 || limit > 50) {
+    throw new RangeError("limit must be an integer between 1 and 50");
+  }
+  return limit;
+}
+
+function formatSearchResult(result: SymbolSearchResult): string {
+  return [
+    `Symbols: ${result.matches.length}/${result.total} shown${result.truncated ? "; refine the query for omitted matches" : ""}`,
+    ...result.matches.map(
+      ({ id, kind, file, range }) =>
+        `${id} [${kind}]\n  ${file}:${range.startLine}:${range.startColumn}-${range.endLine}:${range.endColumn}`,
+    ),
+    result.matches.length
+      ? "Use ai-code-map show '<id>' with a listed ID."
+      : "No matches. Try other words or use rg; only indexed symbols are searchable.",
+  ].join("\n");
 }
 
 const invokedPath = process.argv[1] ? pathToFileURL(process.argv[1]).href : undefined;
