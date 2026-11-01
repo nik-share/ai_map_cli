@@ -2,8 +2,11 @@
 
 ## Unreleased
 
-- Connect Next.js route and special-file symbols to exported handlers and their resolved dependencies, including wrapped callbacks and re-exports, so `read` and `context` can follow them. Existing maps require a rescan.
+## 2026-11-01
 
+### 0.1.0-alpha.5
+
+- Connect Next.js route and special-file symbols to exported handlers and their resolved dependencies, including wrapped callbacks and re-exports, so `read` and `context` can follow them. Existing maps require a rescan.
 - Preserve end-of-file line numbering in `read` and `context` so Next.js route handlers ending in LF or CRLF remain readable.
 - Recognize root and `src` `proxy.ts`/`proxy.js` files as Next.js special files. Update the Next.js analyzer version so existing maps require a rescan.
 
