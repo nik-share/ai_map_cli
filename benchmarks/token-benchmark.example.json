@@ -1,0 +1,39 @@
+{
+  "model": "gpt-6-astra",
+  "reasoningEffort": "high",
+  "codex": ["codex"],
+  "baseline": "search",
+  "repeats": 2,
+  "timeoutSeconds": 180,
+  "budgetSeconds": 2400,
+  "concurrency": 2,
+  "toolOutputTokenLimit": 10000,
+  "projects": [
+    {
+      "id": "example",
+      "root": "/absolute/path/to/project",
+      "tasks": [
+        {
+          "id": "notification-read",
+          "prompt": "Trace marking a notification as read. Explain authorization, changed records, response and cache updates. Cite source and propose two focused regression tests.",
+          "rubric": [
+            "Identifies the real UI-to-server call chain with source citations.",
+            "Explains authorization and exactly which records can change.",
+            "Explains response and cache updates, including failure handling.",
+            "Proposes two concrete tests grounded in the observed code."
+          ]
+        }
+      ]
+    }
+  ],
+  "variants": [
+    { "id": "search", "mode": "search" },
+    {
+      "id": "map",
+      "mode": "map",
+      "mapCli": "../dist/cli.js",
+      "skill": "../skills/ai-code-map/SKILL.md",
+      "instructions": ["../AGENTS.md"]
+    }
+  ]
+}

@@ -9,3 +9,7 @@ coverage/
 benchmarks/results/*.json
 benchmarks/results/*-provisional-*.md
 benchmarks/results/*-relation-quality-*.md
+
+# Local token benchmark paths, prompts and raw model outputs stay private.
+benchmarks/tokens.local.json
+benchmarks/token-runs/

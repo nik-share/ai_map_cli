@@ -1,6 +1,113 @@
-# Parser benchmark microbenchmarks
+# Benchmarks
 
-This directory contains local microbenchmarks for comparing parser behavior.
+## Agent token benchmark
+
+The goal is fewer total model tokens with answers of equal or better quality.
+This harness compares ordinary search with an explicit ai-code-map skill on the
+same source snapshots and tasks. It also compares saved runs after a change.
+It is a repository development tool, not a command in the published npm package.
+
+### Set up once
+
+Use Node 22+, pnpm, an authenticated Codex CLI that supports `exec --json` and
+`--ignore-user-config`, and macOS or Linux. Use disposable source snapshots.
+Model runs use the configured Codex account and consume its tokens. A run can
+send source excerpts from the configured projects to the selected model.
+
+1. Run `pnpm build` after changing ai-code-map.
+2. Copy `benchmarks/token-benchmark.example.json` to `benchmarks/tokens.local.json`.
+3. Set project paths, tasks, quality criteria, model, and the Codex command.
+4. Set each map variant's `mapCli` to its built JavaScript entry and `skill` to
+   its exact `SKILL.md`. Add other instruction files through `instructions`.
+5. Generate current maps in each snapshot before the experiment. The harness
+   checks maps but does not rebuild them or install dependencies.
+6. Check the configuration without starting a model:
+
+   ```bash
+   pnpm benchmark:tokens --check
+   ```
+
+Paths inside the configuration are relative to that configuration file. Local
+configuration and raw results are ignored by Git. Do not publish them without
+review: they can contain private source, answers, paths, and instruction text.
+
+### Run and compare
+
+Run the configured experiment with one command:
+
+```bash
+pnpm benchmark:tokens
+```
+
+The example uses two variants and two repeats. With three projects and one task
+per project, this schedules exactly 12 fresh sessions. Defaults are 180 seconds
+per session, 40 minutes overall, and at most two concurrent sessions. Failed
+attempts stay in the result. The harness never retries or extends the budget.
+Timeout and interruption stop local child process groups. Server-side work
+already submitted may finish; this is not a strict billing cap.
+
+Use `--config <file>` for a different suite and `--output <directory>` for
+persistent results. Output must be outside every measured source project.
+Otherwise the harness prints a unique directory in OS temporary storage; copy
+it elsewhere before temporary-file cleanup.
+
+Each result contains `protocol.json`, `summary.json`, `summary.md`, and raw
+per-session events, stderr, prompt, invocation, result, and answer. The protocol
+records source hashes, runtime settings, exact instruction text and hashes,
+CLI hash, model, tasks, rubric, limits, and the complete schedule.
+
+Quality review is separate from execution:
+
+1. Read the answers in `review/` against the saved criteria. File names omit the
+   variant; answer wording can still reveal it. The rubric is never sent to the
+   measured agent.
+2. Fill `quality.json`: score each criterion from 0 to 1 and set `accepted`.
+   Leave unknown scores as `null`; record the reason for deductions in `notes`.
+3. Run `pnpm benchmark:tokens report <result-directory>`.
+4. After another experiment, run:
+   `pnpm benchmark:tokens compare <before-directory> <after-directory>`.
+
+`compare` is read-only. It rejects incomplete suites, changed tasks/source,
+model or limits, runtime differences, and a changed baseline. Candidate CLI and
+skill changes are allowed. Quality must not decrease for any paired task and
+repeat. Comparison across saved runs checks each variant against its own prior
+answers, not only against the search baseline.
+
+### Interpret the result
+
+- Total tokens = `input_tokens + output_tokens` from Codex `turn.completed`.
+  Cached input is part of input. Reasoning tokens, when present, are part of
+  output. Neither is added twice. Uncached input is shown separately.
+- These are cumulative model-session tokens, not unique source tokens, output
+  characters, prices, or scan time. Prebuilding maps is outside model usage.
+- Positive `savingsPercent` means fewer tokens. `observedSavings` becomes true
+  only for complete pairs with accepted, non-degraded quality scores.
+- Missing usage is unknown. Failed, timed-out, skipped, or malformed runs cannot
+  establish savings. Per-pair deltas remain visible; an aggregate can hide a
+  regression on one project.
+- Two repeats are a development signal, not evidence of stable savings across
+  arbitrary tasks. Model and server-side cache behavior can vary between runs.
+
+The search control uses a source copy without `.ai` or dependencies. Its source
+hash must match the original. Candidate prompts require the exact canonical
+Node/CLI path, overriding only the skill's package-runner syntax. This prevents
+`pnpm exec` from selecting a different installed version. A candidate must issue
+at least one recorded `find`, `read`, `show`, or `map` command through that path;
+wrong-executable commands fail the run. Command auditing is evidence for manual
+review, not a security proof against a deliberately evasive agent.
+
+The harness supplies the exact skill explicitly. It tests skill-guided behavior,
+not automatic skill selection. Repository instruction discovery is disabled;
+the known installed ai-code-map skill is disabled in both variants. Use
+`disabledSkills` for other installed copies. Keep the same machine and skill
+installation between comparisons. Read-only sandboxing and prompt rules reduce
+interference but do not prove complete behavioral isolation; inspect raw command
+traces when judging results. A reported source or instruction mutation stops the
+remaining schedule.
+
+## Parser microbenchmarks
+
+This directory also contains local microbenchmarks for comparing parser behavior.
 
 Reviewed aggregate repository-wide results are recorded separately:
 
