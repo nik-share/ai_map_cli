@@ -42,7 +42,7 @@ import {
 import { compareText, mapLimit } from "./utils/stable.js";
 import { CoreAnalyzer, extractFileStructure } from "./analyzers/core.js";
 import { trustedNestJsAnalyzerMethods } from "./analyzers/nestjs.js";
-import { trustedNextJsAnalyzerMethods } from "./analyzers/nextjs.js";
+import { NextJsAnalyzer, trustedNextJsAnalyzerMethods } from "./analyzers/nextjs.js";
 import { ReactAnalyzer } from "./analyzers/react.js";
 import type { ResolvedConfiguration } from "./config.js";
 import { customProducerRecord, defaultProducerRecord, prepareSemanticInputs } from "./freshness.js";
@@ -772,7 +772,7 @@ function sanitizeJsonValue(value: JsonValue, root: string): JsonValue {
 }
 
 export function defaultAnalyzers(): FrameworkAnalyzer[] {
-  return [new CoreAnalyzer(), new ReactAnalyzer()];
+  return [new CoreAnalyzer(), new ReactAnalyzer(), new NextJsAnalyzer()];
 }
 
 const canonicalCoreAnalyzerMethods: TrustedAnalyzerMethods = {
@@ -791,7 +791,7 @@ function defaultAnalyzerPipeline(): {
   const core = new CoreAnalyzer();
   const react = new ReactAnalyzer();
   return {
-    analyzers: [core, react],
+    analyzers: [core, react, new NextJsAnalyzer()],
     methods: new Map<FrameworkAnalyzer, TrustedAnalyzerMethods>([
       [core, canonicalCoreAnalyzerMethods],
       [react, canonicalReactAnalyzerMethods],

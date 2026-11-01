@@ -51,13 +51,15 @@ export function getTopLevelDefaultExportDeclaration(
   sourceFile: ts.SourceFile,
 ): ts.Declaration | undefined {
   for (const statement of sourceFile.statements) {
-    if (ts.isExportAssignment(statement) && ts.isIdentifier(statement.expression)) {
-      const defaultName = statement.expression.text;
-      const declaration = topLevelDeclarations(sourceFile).find(
-        (item) => getDeclarationName(item, "") === defaultName,
-      );
-      if (declaration) return declaration;
-      continue;
+    if (ts.isExportAssignment(statement) && !statement.isExportEquals) {
+      if (ts.isIdentifier(statement.expression)) {
+        const defaultName = statement.expression.text;
+        const declaration = topLevelDeclarations(sourceFile).find(
+          (item) => getDeclarationName(item, "") === defaultName,
+        );
+        if (declaration) return declaration;
+      }
+      return statement;
     }
 
     if (ts.isFunctionDeclaration(statement) && hasDefaultModifier(statement)) return statement;

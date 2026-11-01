@@ -5,13 +5,13 @@
 - CLI commands are `init`, `scan`, `check`, `show`, `find`, `read`, `map`, and `context`.
 - `scan` output is static analysis only; no code execution.
 - No remote service, account linking, or telemetry is part of the alpha.
-- Framework analyzers included by default are TypeScript/Node and React only.
+- The built-in pipeline includes TypeScript/Node, React, and the experimental Next.js analyzer. Framework selection controls which analyzers run.
 
 ## Next.js and NestJS
 
 - Analyzer classes for Next.js and NestJS are exported and callable through the programmatic API.
-- These analyzers are considered **experimental** and are **not enabled by default** in CLI.
-- They are intentionally not part of the minimal default analyzer contract.
+- Both analyzers remain **experimental**. Next.js runs in CLI when `frameworks: ["auto"]` detects a `next` dependency, or when `frameworks` explicitly includes `nextjs`. NestJS requires programmatic opt-in.
+- Next.js supports root and `src` router folders, exported HTTP names (including destructuring and aliases), and wrapped default exports. This does not imply complete coverage of all Next.js conventions.
 
 ## Parser extensibility
 
@@ -78,5 +78,5 @@
 - The [alpha.2 release benchmark](../benchmarks/results/release-alpha-2-2026-11-01.md) records the
   current resource measurements. August source commits were restored with copied installed
   dependencies; those dependency trees are not claimed to reproduce the August installation.
-- Next.js and NestJS analyzers remain experimental and default-off.
+- Next.js and NestJS remain experimental. Next.js is selected automatically from dependencies; NestJS remains programmatic-only.
 - Any future Tree-sitter production path is still explicitly off for this milestone.

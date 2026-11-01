@@ -144,6 +144,8 @@ console.log(fresh.current, fresh.reasons);
 const map = await loadCodeMap({ root: process.cwd() });
 console.log(showSymbol(map, "component:UserList").matches[0]?.symbol.kind);
 
+// Next.js is already selected automatically for projects with a next dependency.
+// Supplying an analyzer explicitly is still supported.
 const analyzer = createAnalyzer({
   analyzers: [new NextJsAnalyzer()],
   parser: new TypeScriptParserAdapter(),

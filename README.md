@@ -347,7 +347,7 @@ Freshness compares:
 - The CLI remains alpha; command output and APIs may change between releases. Large TypeScript compiler units can still require significant memory.
 - No source execution, no dynamic config loading, no project remote ingestion.
 - `show` is a single-symbol query, not a full search/index query language.
-- `Next.js` and `NestJS` analyzers are exported and available programmatically but are **experimental and default-off** in CLI because they are not in the default analyzer list.
+- The experimental Next.js analyzer runs automatically when `frameworks: ["auto"]` detects a `next` dependency. It supports `app`, `pages`, `src/app`, and `src/pages`, including page-to-layout links and exported HTTP handlers. Set `frameworks: ["nextjs"]` to enable it explicitly, or `["typescript", "react"]` to disable it. NestJS remains experimental and programmatic-only.
 - Tree-sitter/ast-grep is not enabled in production scans. A pinned ast-grep development spike and microbenchmark exist, while TS/JS/React analysis remains compiler-authoritative.
 - Compiler-unit discovery, deterministic file ownership, project references, extended configs, and
   bounded fallback analysis are implemented. Complex conditional package exports and references

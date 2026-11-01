@@ -142,7 +142,7 @@ Required results:
 
 - compact context selection or a natural-language task command;
 - MCP, watch mode, cloud synchronization, authentication, billing, or telemetry;
-- enabling experimental Next.js or NestJS analyzers by default;
+- enabling experimental framework analyzers by default (Next.js auto-selection was added after this milestone);
 - promoting Tree-sitter/ast-grep into the production scan path;
 - embeddings, vector search, or an LLM inside deterministic map generation.
 
@@ -324,7 +324,7 @@ Likely order:
 
 1. read-only stdio MCP tools over the stable structured query API;
 2. watch mode and reusable TypeScript builder state for lower repeated-query latency;
-3. Next.js `src/app` and `src/pages` correctness, then independently validated NestJS maturity;
+3. broader Next.js convention coverage beyond the implemented `src/app` and `src/pages` support, then independently validated NestJS maturity;
 4. optional local lexical/graph indexes when profiling shows that JSONL scans are the bottleneck;
 5. CI impact reports and team/shared-map workflows;
 6. commercial features such as hosted history, pull-request risk review, organization policies, collaboration, and usage analytics—with explicit privacy boundaries.

@@ -11,6 +11,7 @@ import {
   DEFAULT_PRODUCER_ID,
   DEFAULT_SEMANTIC_RESOLVER,
   DEFAULT_SYNTAX_PARSER,
+  NEXTJS_ANALYZER_VERSION,
   PRODUCER_CONTRACT_VERSION,
   SCHEMA_VERSION,
 } from "./constants.js";
@@ -101,7 +102,7 @@ export async function inspectFreshness(
   }
   const expectedAnalyzers = DEFAULT_ANALYZER_NAMES.map((name) => ({
     name,
-    version: ANALYZER_VERSION,
+    version: name === "nextjs" ? NEXTJS_ANALYZER_VERSION : ANALYZER_VERSION,
   })).sort((a, b) => compareText(a.name, b.name));
   if (stableJson(manifest.analyzers) !== stableJson(expectedAnalyzers)) {
     reasons.push("The enabled analyzer or rule-pack version changed.");
@@ -168,6 +169,7 @@ export function defaultProducerRecord(): ProducerRecord {
           version: TYPESCRIPT_SEMANTIC_VERSION,
         },
         analyzers: [...DEFAULT_ANALYZER_NAMES],
+        nextjs: NEXTJS_ANALYZER_VERSION,
         capabilities: [
           "artifact-integrity-v2",
           "compiler-unit-ownership-v3",

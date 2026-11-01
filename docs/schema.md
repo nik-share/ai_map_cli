@@ -13,7 +13,7 @@ source entries now redundantly bind compiler ownership and line counts.
 - `root: string`
 - `include: string[]`
 - `exclude: string[]`
-- `frameworks: Array<"auto"|"typescript"|"node"|"react"|"nextjs"|"nestjs">`
+- `frameworks: Array<"auto"|"typescript"|"node"|"react"|"nextjs"|"nestjs">`. `auto` selects Next.js when package dependencies include `next`. An explicit list containing `nextjs` enables it without detection; a list without `nextjs` disables it. NestJS still requires a programmatic analyzer.
 - `output: string`
 - `includePrivateSymbols: boolean`
 

@@ -1229,7 +1229,7 @@ describe("Milestone 1.1 semantic correctness and freshness", () => {
     await expect(loadCodeMap({ root })).resolves.toEqual(map);
     expect(map.manifest.producer.kind).toBe("custom");
     expect(map.manifest.analyzers).toContainEqual(
-      expect.objectContaining({ name: "nextjs", version: "0.1.0-experimental" }),
+      expect.objectContaining({ name: "nextjs", version: "0.2.0-experimental" }),
     );
     const importTypeSignature = symbolNamed(map, "absoluteImportType").signature;
     expect(importTypeSignature).not.toContain(root);

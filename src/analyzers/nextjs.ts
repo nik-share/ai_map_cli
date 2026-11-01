@@ -2,7 +2,7 @@ import path from "node:path";
 
 import ts from "typescript";
 
-import { SCHEMA_VERSION } from "../constants.js";
+import { NEXTJS_ANALYZER_VERSION, SCHEMA_VERSION } from "../constants.js";
 import { symbolId } from "../ids.js";
 import type {
   AnalysisContribution,
@@ -39,7 +39,7 @@ const registeredNextJsAnalyzers = new WeakSet();
 
 export class NextJsAnalyzer implements FrameworkAnalyzer {
   readonly name = "nextjs";
-  readonly version = "0.1.0-experimental";
+  readonly version = NEXTJS_ANALYZER_VERSION;
 
   constructor() {
     registeredNextJsAnalyzers.add(this);
@@ -47,11 +47,7 @@ export class NextJsAnalyzer implements FrameworkAnalyzer {
 
   supports(context: AnalysisContext): boolean {
     if (!APP_FILES_EXTENSIONS.has(path.extname(context.relativePath).toLowerCase())) return false;
-    return (
-      context.relativePath.startsWith("app/") ||
-      context.relativePath.startsWith("pages/") ||
-      context.relativePath === "middleware.ts"
-    );
+    return parseNextRoute(context.relativePath) !== undefined;
   }
 
   analyze(context: AnalysisContext): AnalysisContribution {
@@ -113,7 +109,7 @@ export class NextJsAnalyzer implements FrameworkAnalyzer {
     }
 
     if (route.kind === "route") {
-      const methods = collectRouteMethods(sourceFile);
+      const methods = collectRouteMethods(context);
       symbols.push(
         makeSymbol(context, sourceFile, "next-route-handler", {
           exported: hasTopLevelExport,
@@ -133,6 +129,7 @@ export class NextJsAnalyzer implements FrameworkAnalyzer {
     symbols.push(
       makeSymbol(context, sourceFile, "next-special-file", {
         exported: hasTopLevelExport,
+        defaultExport: Boolean(defaultExportNode),
         name: route.name,
         facts: {
           router: route.router,
@@ -163,7 +160,7 @@ export function trustedNextJsAnalyzerMethods(analyzer: FrameworkAnalyzer):
   }
   const name = Object.getOwnPropertyDescriptor(analyzer, "name");
   const version = Object.getOwnPropertyDescriptor(analyzer, "version");
-  if (name?.value !== "nextjs" || version?.value !== "0.1.0-experimental") return undefined;
+  if (name?.value !== "nextjs" || version?.value !== NEXTJS_ANALYZER_VERSION) return undefined;
   return {
     supports: (context) => nextJsSupports(context),
     analyze: (context) => nextJsAnalyze(context),
@@ -173,7 +170,10 @@ export function trustedNextJsAnalyzerMethods(analyzer: FrameworkAnalyzer):
 export default NextJsAnalyzer;
 
 function parseNextRoute(relativePath: string): ParsedNextRoute | undefined {
-  const normalized = relativePath.replace(/\\/g, "/");
+  const normalized = relativePath.replace(/\\/g, "/").replace(/^src\//, "");
+  if (/^middleware\.(ts|js)$/.test(normalized)) {
+    return { router: "app", kind: "special", route: "/", name: "middleware", params: [] };
+  }
   if (!normalized.startsWith("app/") && !normalized.startsWith("pages/")) return undefined;
 
   const router: NextRouter = normalized.startsWith("app/") ? "app" : "pages";
@@ -281,37 +281,28 @@ function collectMetadataMarkers(sourceFile: ts.SourceFile): string[] {
   return [...new Set(facts)];
 }
 
-function collectRouteMethods(sourceFile: ts.SourceFile): string {
-  const methods = new Set<string>();
-
-  const addFromDeclaration = (name: string | undefined): void => {
-    if (!name) return;
-    const normalized = name.toUpperCase();
-    if (ROUTE_METHODS.has(normalized)) methods.add(normalized.toLowerCase());
-  };
-
-  for (const statement of sourceFile.statements) {
-    if (ts.isFunctionDeclaration(statement) && statement.name) {
-      addFromDeclaration(statement.name.text);
-      continue;
-    }
-
-    if (!ts.isVariableStatement(statement)) continue;
-    for (const declaration of statement.declarationList.declarations) {
-      if (!ts.isIdentifier(declaration.name)) continue;
-      if (isFunctionLikeExpression(declaration.initializer)) {
-        addFromDeclaration(declaration.name.text);
-      }
-    }
-  }
-
-  return [...methods].join(",");
-}
-
-function isFunctionLikeExpression(
-  node: ts.Expression | undefined,
-): node is ts.ArrowFunction | ts.FunctionExpression {
-  return node !== undefined && (ts.isArrowFunction(node) || ts.isFunctionExpression(node));
+function collectRouteMethods(context: AnalysisContext): string {
+  const module = context.checker.getSymbolAtLocation(context.sourceFile);
+  if (!module) return "";
+  return context.checker
+    .getExportsOfModule(module)
+    .filter((symbol) => {
+      if (!ROUTE_METHODS.has(symbol.name)) return false;
+      if (
+        symbol.declarations?.some(
+          (declaration) =>
+            ts.isExportSpecifier(declaration) &&
+            (declaration.isTypeOnly || declaration.parent.parent.isTypeOnly),
+        )
+      )
+        return false;
+      const target =
+        symbol.flags & ts.SymbolFlags.Alias ? context.checker.getAliasedSymbol(symbol) : symbol;
+      return (target.flags & ts.SymbolFlags.Value) !== 0;
+    })
+    .map((symbol) => symbol.name.toLowerCase())
+    .sort()
+    .join(",");
 }
 
 function runtimeFromSource(sourceFile: ts.SourceFile): string {
@@ -333,17 +324,20 @@ function hasDirective(sourceFile: ts.SourceFile, directive: string): boolean {
 
 function collectContainingAppLayouts(relativePath: string, context: AnalysisContext): string[] {
   const fileSegments = relativePath.replace(/\\/g, "/").split("/").filter(Boolean);
-  if (fileSegments[0] !== "app") return [];
+  const appIndex = fileSegments[0] === "src" ? 1 : 0;
+  if (fileSegments[appIndex] !== "app") return [];
 
-  const layoutSegments = fileSegments.slice(1, -1);
+  const layoutSegments = fileSegments.slice(appIndex + 1, -1);
   const candidates: string[] = [];
   for (let index = 0; index <= layoutSegments.length; index += 1) {
     const prefix = layoutSegments.slice(0, index);
-    const candidateWithoutExt = ["app", ...prefix, "layout"].join("/");
-    const tsx = `${candidateWithoutExt}.tsx`;
-    const ts = `${candidateWithoutExt}.ts`;
-    if (programContainsSourceFile(context, tsx)) candidates.push(tsx);
-    if (programContainsSourceFile(context, ts)) candidates.push(ts);
+    const candidateWithoutExt = [...fileSegments.slice(0, appIndex + 1), ...prefix, "layout"].join(
+      "/",
+    );
+    for (const extension of APP_FILES_EXTENSIONS) {
+      const candidate = `${candidateWithoutExt}${extension}`;
+      if (programContainsSourceFile(context, candidate)) candidates.push(candidate);
+    }
   }
   return candidates;
 }

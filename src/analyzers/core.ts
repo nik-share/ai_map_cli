@@ -131,7 +131,7 @@ function extractTopLevelSymbol(
   }
   if (ts.isVariableStatement(statement)) {
     const defaultExport = hasDefaultModifier(statement);
-    for (const declaration of statement.declarationList.declarations) {
+    for (const declaration of statement.declarationList.declarations.flatMap(bindingDeclarations)) {
       if (!ts.isIdentifier(declaration.name)) continue;
       const functionLike =
         declaration.initializer !== undefined &&
@@ -147,6 +147,15 @@ function extractTopLevelSymbol(
       keepBestDeclaration(output, record, true);
     }
   }
+}
+
+function bindingDeclarations(
+  declaration: ts.VariableDeclaration | ts.BindingElement,
+): Array<ts.VariableDeclaration | ts.BindingElement> {
+  if (ts.isIdentifier(declaration.name)) return [declaration];
+  return declaration.name.elements.flatMap((element) =>
+    ts.isBindingElement(element) ? bindingDeclarations(element) : [],
+  );
 }
 
 function isNameExported(context: AnalysisContext, name: string, node: ts.Node): boolean {
@@ -193,7 +202,9 @@ function declarationIdMap(
         result.set(member, memberId);
       }
     } else if (ts.isVariableStatement(statement)) {
-      for (const declaration of statement.declarationList.declarations) {
+      for (const declaration of statement.declarationList.declarations.flatMap(
+        bindingDeclarations,
+      )) {
         if (!ts.isIdentifier(declaration.name)) continue;
         const kind =
           declaration.initializer &&
@@ -431,9 +442,9 @@ function findExportedDeclaration(
       return statement;
     }
     if (ts.isVariableStatement(statement)) {
-      const declaration = statement.declarationList.declarations.find(
-        (item) => ts.isIdentifier(item.name) && item.name.text === exportedName,
-      );
+      const declaration = statement.declarationList.declarations
+        .flatMap(bindingDeclarations)
+        .find((item) => ts.isIdentifier(item.name) && item.name.text === exportedName);
       if (declaration) return declaration;
     }
     if (
@@ -483,9 +494,9 @@ function findDeclarationByName(
       return statement;
     }
     if (ts.isVariableStatement(statement)) {
-      const declaration = statement.declarationList.declarations.find(
-        (item) => ts.isIdentifier(item.name) && item.name.text === name,
-      );
+      const declaration = statement.declarationList.declarations
+        .flatMap(bindingDeclarations)
+        .find((item) => ts.isIdentifier(item.name) && item.name.text === name);
       if (declaration) return declaration;
     }
   }
@@ -570,7 +581,7 @@ function declarationToId(declaration: ts.Declaration, filePath: string): string 
       parentName,
     );
   }
-  if (ts.isVariableDeclaration(declaration)) {
+  if (ts.isVariableDeclaration(declaration) || ts.isBindingElement(declaration)) {
     const name = getDeclarationName(declaration);
     const kind: SymbolKind =
       declaration.initializer &&
