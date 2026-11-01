@@ -52,19 +52,6 @@ by task and model; bounded output alone does not guarantee lower total token use
 The optional developer token benchmark calls a model and consumes tokens. It is
 separate from normal local CLI use and does not run during installation or scanning.
 
-### Exit codes
-
-| Command   | Success                   | Failure behavior                                           |
-| --------- | ------------------------- | ---------------------------------------------------------- |
-| `init`    | `0`                       | invalid configuration or environment errors -> `1`         |
-| `scan`    | `0`                       | parser errors with `--strict` -> `3`, otherwise `0`        |
-| `check`   | `0` when current          | stale map -> `2`, missing map -> `2`                       |
-| `map`     | `0` when current          | stale, missing, or invalid map -> `2`; other errors -> `1` |
-| `show`    | `0`                       | no match -> `1`                                            |
-| `find`    | `0`, including no matches | invalid query or limit -> `1`                              |
-| `read`    | `0`                       | invalid ID or source validation error -> `1`               |
-| `context` | `0`                       | stale, missing, or invalid map -> `2`; other errors -> `1` |
-
 ## CLI command matrix
 
 All commands share these options:
