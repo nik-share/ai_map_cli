@@ -55,7 +55,9 @@
   ownership and line counts. It is not a cryptographic signature against rewriting every redundant
   ownership record and integrity hash.
 - Default scans use a separate sequential worker for each compiler unit. Each worker exits before
-  the next unit starts, releasing compiler memory before normalization and persistence. This adds
+  the next unit starts. A local V8 inspector session collects unreachable compiler objects before
+  the result is cloned into the parent; it opens no network port. This releases compiler memory
+  before normalization and persistence, but adds collection and
   startup overhead, particularly for small projects with many configs. A single large compiler unit
   can still use substantial memory; there is no fixed heap cap or partial-analysis fallback.
 - Custom analyzers, parsers, and semantic resolvers run in-process to preserve extension behavior.

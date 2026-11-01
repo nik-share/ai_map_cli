@@ -201,7 +201,8 @@ implied by correctness alone.
 Both the provisional and subsequent clean-commit August runs exceeded all three RSS gates.
 Alpha.2 addresses the measured cause: compiler heaps remained resident across units and through
 serialization. Default scans now run each compiler unit in a sequential worker and wait for its
-exit before continuing. Only normalized records return to the coordinator. The worker uses
+exit before continuing. A local V8 collection before handoff prevents the result clone from
+overlapping the unreachable compiler heap. Only normalized records return to the coordinator. The worker uses
 TypeScript's type-information JSDoc mode, which preserves JavaScript JSDoc types; the scanner does
 not expose TypeScript JSDoc prose or semantic link diagnostics. Custom pipelines keep their original
 in-process execution and full JSDoc access. No semantic inputs or artifact checks are removed.
