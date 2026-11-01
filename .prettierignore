@@ -3,6 +3,7 @@ coverage
 pnpm-lock.yaml
 tests/fixtures
 benchmarks/fixtures
+benchmarks/token-runs
 PROJECT.md
 config.schema.json
 schemas

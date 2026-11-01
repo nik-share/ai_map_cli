@@ -91,6 +91,35 @@ describe("programmatic API", () => {
 });
 
 describe("CLI observable behavior", () => {
+  it("returns bounded related source context and refuses missing or stale maps", async () => {
+    const root = await fixture("typescript-node");
+    const missing = await runCli(["context", "Calculator", "--root", root, "--json"]);
+    expect(missing.code, missing.stderr).toBe(2);
+    await scanProject({ root });
+    const result = await runCli([
+      "context",
+      "Calculator",
+      "--root",
+      root,
+      "--max-lines",
+      "4",
+      "--json",
+    ]);
+    expect(result.code, result.stderr).toBe(0);
+    expect(parseCliJson(result)).toMatchObject({
+      usedLines: 4,
+      snippets: [expect.objectContaining({ file: "src/service.ts" })],
+    });
+    const text = await runCli(["context", "Calculator", "--root", root, "--max-lines", "4"]);
+    expect(text.stdout).toContain("Context:");
+    expect(text.stdout).toContain("src/service.ts:");
+    expect(text.stdout).toContain("Budget omitted source");
+    await writeFile(join(root, "src/service.ts"), "export class Calculator {}\n");
+    const stale = await runCli(["context", "Calculator", "--root", root, "--json"]);
+    expect(stale.code, stale.stderr).toBe(2);
+    expect(parseCliJson(stale)).toMatchObject({ current: false });
+  });
+
   it("returns the whole structural map in one call and refuses missing or stale maps", async () => {
     const root = await fixture("typescript-node");
     const missing = await runCli(["map", "--root", root, "--json"]);
@@ -272,7 +301,7 @@ describe("CLI observable behavior", () => {
   }, 60_000);
 
   it("provides help for every public command", async () => {
-    for (const command of ["init", "scan", "check", "show", "find", "read", "map"]) {
+    for (const command of ["init", "scan", "check", "show", "find", "read", "map", "context"]) {
       const result = await runCli([command, "--help"]);
       expect(result.code, `${command}: ${result.stderr}`).toBe(0);
       expect(result.stdout).toContain("--root");

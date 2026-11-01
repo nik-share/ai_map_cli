@@ -12,6 +12,7 @@ import { scanProject } from "./scan.js";
 import { findSymbols, type SymbolSearchResult } from "./search.js";
 import { formatShowResult, showSymbol } from "./show.js";
 import { readSymbolSource } from "./read.js";
+import { buildSourceContext, formatSourceContext } from "./context.js";
 import { formatReadNavigation } from "./read-navigation.js";
 import { buildProjectMap, formatProjectMap } from "./project-map.js";
 import { loadCodeMap, loadCodeMapFrom } from "./storage.js";
@@ -129,6 +130,45 @@ export async function runCli(argv = process.argv): Promise<number> {
       },
     );
   addCommonOptions(findCommand);
+
+  const contextCommand = program
+    .command("context")
+    .description(
+      "Collect bounded current source for lexical matches and their direct graph neighbors",
+    )
+    .argument("<query>", "quoted search words or an exact symbol ID")
+    .option("--max-lines <number>", "shared source-line budget, 1..2000", Number, 800)
+    .option("--max-chars <number>", "shared source-character budget, 256..64000", Number, 32000)
+    .option("--seeds <number>", "maximum matches to expand, 1..5", Number, 3)
+    .option("--json", "print structured context, budgets and omitted ranges")
+    .action(
+      async (
+        query: string,
+        options: CommonCliOptions & { maxLines: number; maxChars: number; seeds: number },
+        command: Command,
+      ) => {
+        const common = collectOptions(command);
+        const inspection = await inspectFreshness(loadOptions(common));
+        if (!inspection.result.current || !inspection.map) {
+          if (common.json) printJson(inspection.result);
+          else
+            process.stdout.write(
+              `Map unavailable: ${inspection.result.reasons.join(" ")} Run ai-code-map scan.\n`,
+            );
+          exitCode = 2;
+          return;
+        }
+        const result = await buildSourceContext(inspection.map, query, {
+          root: inspection.result.root,
+          maxLines: options.maxLines,
+          maxChars: options.maxChars,
+          seeds: options.seeds,
+        });
+        if (common.json) printJson(result);
+        else process.stdout.write(`${formatSourceContext(result)}\n`);
+      },
+    );
+  addCommonOptions(contextCommand);
 
   const readCommand = program
     .command("read")

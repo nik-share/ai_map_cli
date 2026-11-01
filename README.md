@@ -135,6 +135,34 @@ Results include stable IDs usable by `show`, kinds, and full source ranges. The 
 matches; `--limit <1..50>` adjusts this. `--json` returns `{ query, total, truncated, matches }`.
 No matches is a successful empty search. Use `rg` for source text or symbols outside the index.
 
+### `ai-code-map context <query>`
+
+Collects current source for a quoted lexical query or exact symbol ID and its direct
+exact/framework-derived graph neighbors in one call. It checks freshness first;
+missing or stale maps return exit code 2. No model, embeddings, or network is used.
+
+The default selects up to three matches and favors behavior over partial type matches.
+For partial queries, it checks missing query words in the current bodies of up to
+50 lexical candidates. It expands the strongest callable matches when source
+evidence distinguishes them. This lexical ranking does not infer intent or synonyms.
+An exact name or ID takes precedence. Each selected match expands once using the
+bounded navigation rules of `read`; reference-only class neighbors are counted as
+omitted, so a namespace reference does not load every method. Explicit class
+queries remain supported. Source windows include two context lines.
+Overlapping and adjacent ranges in the same file are emitted together with original
+line numbers. Shared budgets are 800 source lines and 32,000 source characters
+(including line separators); headers and bounded metadata are additional.
+
+Options: `--seeds <1..5>`, `--max-lines <1..2000>`, `--max-chars <256..64000>`,
+`--json`. Partial lexical matches keep their unmatched terms. Omitted source ranges,
+other search-match count, and omitted navigation entries are explicit. Test call
+sites are hints, not proof of coverage. A packet is a bounded local neighborhood,
+not a claim to contain every dependency or every fact needed for the task.
+
+For example: `ai-code-map context 'notification mark read'`. Reuse the returned
+source and read only a specific missing range or dependency next. The existing
+`find`, `read`, and `show` commands remain available for narrower requests.
+
 ### `ai-code-map read <id>`
 
 Reads current source using an exact stable ID returned by `find`. Includes two lines
@@ -163,7 +191,7 @@ this command validates the selected source file, not every project dependency.
 
 The packaged `AGENTS.md` describes this navigation workflow. A reusable Codex skill
 is included at `skills/ai-code-map/SKILL.md`. Copy the `ai-code-map` folder to your
-Codex skills directory and invoke `$ai-code-map`. It guides bounded source reading,
+Codex skills directory and invoke `$ai-code-map`. It guides combined context retrieval,
 relation lookups, and targeted fallback for unindexed tests; it also supports older
 CLI versions without `read` by using the returned source ranges directly.
 

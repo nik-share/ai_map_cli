@@ -1,3 +1,5 @@
+export { buildSourceContext, formatSourceContext } from "./context.js";
+export type { ContextOptions, ContextResult, ContextSnippet, ContextOmission } from "./context.js";
 export { readSymbolSource } from "./read.js";
 export type { ReadSourceOptions, ReadSourceResult } from "./read.js";
 export type { ReadNavigation, ReadNavigationLink } from "./read-navigation.js";

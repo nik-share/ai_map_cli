@@ -40,6 +40,18 @@ one-sided coherent corruption; a rescan is required.
   - the CLI `map` command checks freshness and reuses the validated map before calling these functions; missing/stale/invalid artifacts return exit code 2
 - `computeManifestIntegrityHash(manifest) -> string`
   - computes the canonical code-point-ordered manifest integrity hash used by persistence and tests
+- `buildSourceContext(map, query, { root, maxLines?, maxChars?, seeds? }) -> Promise<ContextResult>`
+  - selects lexical matches (exact IDs/names take precedence), then expands one direct graph hop using the bounded `read` navigation rules
+  - for partial queries, ranks callable candidates using missing query words in their current source bodies and expands the strongest ties; inspects at most the 50 lexical candidates, with per-term occurrence counts capped at three
+  - skips reference-only class neighbors and counts them as omitted navigation; an explicitly selected class still expands normally
+  - defaults: 3 matches (1..5), 800 source lines (1..2000), 32,000 source characters including separators (256..64000)
+  - verifies paths, hashes and ranges for source-ranking candidates and selected symbols; coalesces overlapping/adjacent source intervals
+  - returns `{ query, matches, moreMatches, selected, snippets, omitted, tests, omittedNavigation, usedLines, usedChars, limits }`
+  - `snippets` contain `{ file, startLine, endLine, source }`; `omitted` lists unread source ranges and symbol IDs excluded by the shared budget
+  - test call sites are bounded navigation hints; omitted-navigation counts sum entries excluded by each seed's navigation limits and the shared test-site limit
+  - the API validates selected source files; the CLI `context` also checks full map freshness before calling it
+- `formatSourceContext(result) -> string`
+  - renders numbered source windows once per contiguous range, with bounded selection/test/omission metadata; metadata is additional to the source budgets
 - `readSymbolSource(map, id, { root, limit?, offset? }) -> Promise<ReadSourceResult>`
   - requires an exact stable ID; reads current source with two context lines per side
   - `root` is the project root; `limit` defaults to 80 (integer 1..200); `offset` defaults to zero within that window

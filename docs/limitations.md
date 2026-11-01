@@ -2,7 +2,7 @@
 
 ## In-scope alpha
 
-- CLI commands are limited to `init`, `scan`, `check`, `show`.
+- CLI commands are `init`, `scan`, `check`, `show`, `find`, `read`, `map`, and `context`.
 - `scan` output is static analysis only; no code execution.
 - No remote service, account linking, or telemetry is part of the alpha.
 - Framework analyzers included by default are TypeScript/Node and React only.

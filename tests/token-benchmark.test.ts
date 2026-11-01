@@ -88,6 +88,7 @@ async function fixture(
     cancel?: boolean;
     ignoreMap?: boolean;
     wrongCli?: boolean;
+    searchCommand?: string;
   } = {},
 ) {
   const root = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), "token-benchmark-test-")));
@@ -129,7 +130,7 @@ if(${String(options.hang ?? options.cancel ?? false)}) { fs.writeFileSync(${JSON
 else {
  if(map && ${String(options.mutate ?? false)}) fs.appendFileSync('entry.ts','// changed\\n');
  if(!map && fs.existsSync('.ai')) process.exit(9);
- console.log(JSON.stringify({type:'item.completed',item:{type:'command_execution',command:map && !${String(options.ignoreMap ?? false)} ? ${JSON.stringify(options.wrongCli ? "pnpm exec ai-code-map read value" : JSON.stringify(process.execPath) + " " + JSON.stringify(path.join(root, "map.mjs")) + " read value")} : 'rg value entry.ts',aggregated_output:'value'}}));
+ console.log(JSON.stringify({type:'item.completed',item:{type:'command_execution',command:map && !${String(options.ignoreMap ?? false)} ? ${JSON.stringify(options.wrongCli ? "pnpm exec ai-code-map read value" : JSON.stringify(process.execPath) + " " + JSON.stringify(path.join(root, "map.mjs")) + " read value")} : ${JSON.stringify(options.searchCommand ?? "rg value entry.ts")},aggregated_output:'value'}}));
  console.log(JSON.stringify({type:'item.completed',item:{type:'agent_message',text:'value is 1 (entry.ts:1)'}}));
  if(map && ${String(options.failMap ?? false)}) { console.log(JSON.stringify({type:'turn.failed'})); process.exit(1); }
  console.log(JSON.stringify({type:'turn.completed',usage:{input_tokens:map?60:100,cached_input_tokens:map?10:20,output_tokens:10}}));
@@ -188,6 +189,45 @@ describe("reproducible token benchmark", () => {
     const output = path.join(f.project, "new-results");
     await expect(runBenchmark(f.config, output)).rejects.toThrow(/outside/);
     await expect(fs.access(output)).rejects.toThrow();
+  });
+
+  it("keeps a control copy verifiable when its output is ignored by an ancestor Git repository", async () => {
+    const f = await fixture();
+    await fs.writeFile(path.join(f.root, ".gitignore"), "results/\n");
+    const init = await import("node:child_process");
+    await new Promise<void>((resolve, reject) => {
+      const child = init.spawn("git", ["init", "-q"], { cwd: f.root });
+      child.on("error", reject);
+      child.on("close", (code) => (code === 0 ? resolve() : reject(new Error(`git init ${code}`))));
+    });
+    expect((await runBenchmark(f.config, f.output)).status).toBe("complete");
+  });
+
+  it("allows excluding .ai from search while still rejecting an actual map read", async () => {
+    for (const searchCommand of [
+      "rg -g '!.ai/**' value entry.ts",
+      "rg --glob '!.ai/**' value entry.ts",
+      "/bin/zsh -lc \"rg --glob '\"'!.ai/**'\"' value entry.ts\"",
+    ]) {
+      const exclusion = await fixture({ searchCommand });
+      const excluded = await runBenchmark(exclusion.config, exclusion.output);
+      expect(excluded.runs.map((run) => run.errors)).toEqual([[], []]);
+      expect(excluded.status).toBe("complete");
+    }
+    const access = await fixture({
+      searchCommand: "rg -g '!.ai/**' value .ai/code-map/symbols.jsonl",
+    });
+    const report = await runBenchmark(access.config, access.output);
+    expect(report.runs.find((run) => run.variant === "search")?.errors.join(" ")).toMatch(
+      /map navigation/i,
+    );
+    const absolute = await fixture({
+      searchCommand: "cat /private/tmp/project/.ai/code-map/symbols.jsonl",
+    });
+    const absoluteReport = await runBenchmark(absolute.config, absolute.output);
+    expect(absoluteReport.runs.find((run) => run.variant === "search")?.errors.join(" ")).toMatch(
+      /map navigation/i,
+    );
   });
 
   it("compares quality across versions without rewriting saved reports", async () => {

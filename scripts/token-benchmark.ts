@@ -407,15 +407,17 @@ async function execute(
   });
 }
 
-async function sourceFiles(root: string, deadline = Infinity): Promise<string[]> {
-  const git = await execute(
-    ["git", "ls-files", "--cached", "--others", "--exclude-standard", "-z", "--", "."],
-    root,
-    remaining(10000, deadline),
-  );
+async function sourceFiles(root: string, deadline = Infinity, useGit = true): Promise<string[]> {
+  const git = useGit
+    ? await execute(
+        ["git", "ls-files", "--cached", "--others", "--exclude-standard", "-z", "--", "."],
+        root,
+        remaining(10000, deadline),
+      )
+    : undefined;
   const ignored = /(^|\/)(node_modules|\.git|\.ai|dist|coverage)(\/|$)|(^|\/)\.env(?:\.|$)/;
   const files =
-    git.code === 0
+    git?.code === 0
       ? git.stdout.split("\0").filter(Boolean)
       : await fg("**/*", {
           cwd: root,
@@ -427,8 +429,8 @@ async function sourceFiles(root: string, deadline = Infinity): Promise<string[]>
   return [...new Set(files)].filter((f) => !ignored.test(f)).sort();
 }
 
-async function sourceHash(root: string, deadline = Infinity): Promise<string> {
-  const files = await sourceFiles(root, deadline);
+async function sourceHash(root: string, deadline = Infinity, useGit = true): Promise<string> {
+  const files = await sourceFiles(root, deadline, useGit);
   const hash = createHash("sha256");
   for (const relative of files) {
     remaining(Infinity, deadline);
@@ -456,8 +458,23 @@ async function copyControlSource(
     await fs.mkdir(path.dirname(output), { recursive: true });
     await fs.copyFile(path.join(project.root, relative), output);
   }
-  if ((await sourceHash(target, deadline)) !== project.sourceHash)
+  // The generated control lives under the benchmark output, which can itself be
+  // ignored by an ancestor Git worktree. Its frozen source set must therefore
+  // be hashed from disk, rather than by that ancestor's ignore rules.
+  if ((await sourceHash(target, deadline, false)) !== project.sourceHash)
     throw new Error("Control copy differs from source snapshot");
+}
+
+function commandUsesMapNavigation(command: string, variants: Variant[]): boolean {
+  if (
+    /\bai-code-map\b/.test(command) ||
+    variants.some((v) => v.mapCli && command.includes(v.mapCli))
+  )
+    return true;
+  // A negative glob such as --glob '!.ai/**' excludes generated map artifacts.
+  // It is not a read. A later unprefixed .ai path in the same command still is.
+  const withoutExclusions = command.replace(/!\.ai(?:\/\*\*)?/g, "");
+  return /(?:^|[/\s'"])(?:\.\/)?\.ai(?:[/'"\s]|$)/.test(withoutExclusions);
 }
 
 async function variantInputs(config: Config): Promise<Variant[]> {
@@ -671,18 +688,16 @@ async function runSession(report: BenchmarkReport, plan: Plan, deadline: number)
     if (!analysis.answer.trim()) result.errors.push("Missing final answer");
     if (
       variant.mode === "search" &&
-      analysis.commandLines.some(
-        (s) =>
-          /ai-code-map|\.ai(?:[/'"\s]|$)/.test(s) ||
-          report.variants.some((v) => v.mapCli && s.includes(v.mapCli)),
-      )
+      analysis.commandLines.some((command) => commandUsesMapNavigation(command, report.variants))
     )
       result.errors.push("Search control used map navigation");
     if (variant.mode === "map" && variant.mapCli) {
       const cli = variant.mapCli;
       const exactCalls = analysis.commandLines.filter(
         (s) =>
-          s.includes(cli) && s.includes(process.execPath) && /\b(find|read|show|map)\b/.test(s),
+          s.includes(cli) &&
+          s.includes(process.execPath) &&
+          /\b(find|read|show|map|context)\b/.test(s),
       );
       if (!exactCalls.length)
         result.errors.push("Candidate map was not invoked through the required canonical command");
@@ -697,7 +712,7 @@ async function runSession(report: BenchmarkReport, plan: Plan, deadline: number)
     }
     if (
       (await sourceHash(project.root)) !== project.sourceHash ||
-      (await sourceHash(cwd)) !== project.sourceHash
+      (await sourceHash(cwd, Infinity, variant.mode !== "search")) !== project.sourceHash
     )
       result.errors.push("Source changed during run");
     if ((await variantInputs(config)).find((v) => v.id === variant.id)?.hash !== variant.hash)

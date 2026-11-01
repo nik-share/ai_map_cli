@@ -8,6 +8,7 @@ export default tseslint.config(
       "coverage/**",
       "tests/fixtures/**",
       "benchmarks/fixtures/**",
+      "benchmarks/token-runs/**",
       "eslint.config.js",
     ],
   },

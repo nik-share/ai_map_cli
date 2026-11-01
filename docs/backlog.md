@@ -35,7 +35,7 @@
 ## Explicitly not core
 
 - LLMs, embeddings, API keys, network calls, or telemetry in deterministic map generation.
-- Natural-language CLI commands or `context "task" --budget`.
+- Model-interpreted natural-language tasks. The bounded `context` command uses lexical matches and stored graph edges only.
 - Web UI, cloud service, billing, authentication, or deployment in this package.
 - ts-morph, dependency-cruiser, or react-docgen as authoritative analyzers.
 - Next.js private internals or NestJS runtime reflection.
