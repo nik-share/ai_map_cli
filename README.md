@@ -153,6 +153,10 @@ Up to four incoming file-level call/reference sites are also included, such as
 route registrations outside any function. Files of at most 80 lines are read in
 full; larger files use eight lines on each side of the mapped site. These windows
 share the same budgets and source validation as symbol windows.
+After those windows, remaining budget can include up to four small functions or
+values referenced by direct outgoing neighbors. Their bodies must be at most 80
+lines; calls take priority over references. This extra step does not recurse or
+expand incoming callers, and cannot displace the primary source windows.
 Overlapping and adjacent ranges in the same file are emitted together with original
 line numbers. Shared budgets are 800 source lines and 32,000 source characters
 (including line separators); headers and bounded metadata are additional.

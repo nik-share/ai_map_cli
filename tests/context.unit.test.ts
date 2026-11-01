@@ -59,7 +59,7 @@ async function fixture() {
       edge(target.id, unrelated.id, "heuristic"),
     ],
   } as CodeMap;
-  return { root, source, map, target, helper, caller, unrelated };
+  return { root, source, map, target, helper, caller, unrelated, symbol, edge };
 }
 
 it("collects direct source neighbors and merges overlapping ranges without following uncertain edges", async () => {
@@ -87,6 +87,72 @@ it("collects direct source neighbors and merges overlapping ranges without follo
   f.map.symbols.reverse();
   f.map.relations.reverse();
   expect(await buildSourceContext(f.map, f.target.id, { root: f.root })).toEqual(result);
+});
+
+it("includes small outgoing dependencies without recursively expanding callers or uncertain links", async () => {
+  const f = await fixture();
+  await writeFile(join(f.root, "dependency.ts"), f.source);
+  f.map.files.push({ path: "dependency.ts", hash: hashText(f.source) } as CodeMap["files"][number]);
+  const leaf = f.symbol("leaf", "dependency.ts", 3, 5);
+  const constant = {
+    ...f.symbol("setting", "dependency.ts", 9, 9),
+    id: "variable:dependency.ts#setting",
+    kind: "variable",
+  } as SymbolRecord;
+  const deeper = f.symbol("deeper", "dependency.ts", 18, 20);
+  f.map.symbols.push(leaf, constant, deeper);
+  f.map.relations.push(
+    f.edge(f.helper.id, leaf.id),
+    f.edge(f.helper.id, leaf.id),
+    { ...f.edge(f.helper.id, constant.id, "framework-derived"), type: "references" },
+    f.edge(leaf.id, deeper.id),
+    f.edge(f.caller.id, deeper.id),
+    f.edge(f.helper.id, f.unrelated.id, "heuristic"),
+    f.edge(f.unrelated.id, f.helper.id),
+  );
+  const result = await buildSourceContext(f.map, f.target.id, { root: f.root });
+  expect(result.selected.map((s) => s.id).sort()).toEqual(
+    [f.target.id, f.helper.id, f.caller.id, leaf.id, constant.id].sort(),
+  );
+  expect(result.snippets.find((s) => s.file === "dependency.ts")).toEqual({
+    file: "dependency.ts",
+    startLine: 1,
+    endLine: 11,
+    source: f.source.split("\n").slice(0, 11).join("\n"),
+  });
+  f.map.symbols.reverse();
+  f.map.relations.reverse();
+  expect(await buildSourceContext(f.map, f.target.id, { root: f.root })).toEqual(result);
+  await writeFile(join(f.root, "dependency.ts"), "changed");
+  await expect(buildSourceContext(f.map, f.target.id, { root: f.root })).rejects.toMatchObject({
+    code: "STALE_SOURCE",
+  });
+});
+
+it("caps small dependencies at four and preserves primary source when the budget is full", async () => {
+  const f = await fixture();
+  const primary = await buildSourceContext(f.map, f.target.id, { root: f.root });
+  const source = Array.from({ length: 100 }, (_, i) => `dependency line ${i + 1}`).join("\n");
+  await writeFile(join(f.root, "dependency.ts"), source);
+  f.map.files.push({ path: "dependency.ts", hash: hashText(source) } as CodeMap["files"][number]);
+  const leaves = Array.from({ length: 6 }, (_, i) =>
+    f.symbol(`leaf${i}`, "dependency.ts", i * 10 + 3, i * 10 + 5),
+  );
+  const large = f.symbol("large", "dependency.ts", 1, 90);
+  f.map.symbols.push(...leaves, large);
+  f.map.relations.push(...[...leaves, large].map((s) => f.edge(f.helper.id, s.id)));
+  const result = await buildSourceContext(f.map, f.target.id, { root: f.root });
+  expect(result.selected.filter((s) => s.id.includes("dependency.ts")).map((s) => s.id)).toEqual(
+    leaves.slice(0, 4).map((s) => s.id),
+  );
+  expect(result.omittedNavigation).toBe(primary.omittedNavigation + 3);
+  const bounded = await buildSourceContext(f.map, f.target.id, {
+    root: f.root,
+    maxLines: primary.usedLines,
+  });
+  expect(bounded.snippets).toEqual(primary.snippets);
+  expect(bounded.omitted.map((s) => s.id)).toEqual(leaves.slice(0, 4).map((s) => s.id));
+  expect(bounded.usedLines).toBe(primary.usedLines);
 });
 
 it("enforces a shared line budget and reports the unread ranges instead of silently claiming completeness", async () => {

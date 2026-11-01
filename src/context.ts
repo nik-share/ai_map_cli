@@ -50,7 +50,7 @@ function budget(value: number, min: number, max: number, name: string): number {
   return value;
 }
 
-/** Expand lexical matches by one direct graph hop and coalesce bounded current source. */
+/** Expand matches and small outgoing dependencies into bounded current source. */
 export async function buildSourceContext(
   map: CodeMap,
   query: string,
@@ -144,12 +144,14 @@ export async function buildSourceContext(
   };
   const byId = new Map(map.symbols.map((s) => [s.id, s]));
   const selected = new Map<string, "match" | "neighbor">(matches.map((s) => [s.id, "match"]));
+  const outgoingNeighbors = new Set<string>();
   const tests = new Map<string, { file: string; line: number }>();
   // Expand only the original matches. Following every new neighbor would recreate the whole graph.
   for (const match of matches) {
     const nav = buildReadNavigation(map, match.id);
     result.omittedNavigation += nav.omittedLinks + nav.omittedTests;
     for (const link of nav.links) {
+      if (link.direction === "outgoing") outgoingNeighbors.add(link.id);
       if (selected.has(link.id)) continue;
       // A reference to the class namespace is not a request for every method body.
       if (link.type === "references" && byId.get(link.id)?.kind === "class") {
@@ -188,7 +190,6 @@ export async function buildSourceContext(
   );
   result.fileReferences = fileSites.slice(0, 4);
   result.omittedNavigation += Math.max(0, fileSites.length - result.fileReferences.length);
-  result.selected = [...selected].map(([id, role]) => ({ id, role }));
   const requested: ContextOmission[] = [];
   const includeWindow = (
     id: string,
@@ -237,6 +238,45 @@ export async function buildSourceContext(
       small ? file.lines.length : Math.min(file.lines.length, site.line + 8),
     );
   }
+  // Small dependencies avoid a separate find/read round trip. Fill them last so
+  // they cannot displace the matched flow or its entry points. Never recurse.
+  const dependencies = new Map<string, { symbol: SymbolRecord; call: boolean }>();
+  for (const relation of map.relations) {
+    if (
+      !outgoingNeighbors.has(relation.from) ||
+      selected.get(relation.from) !== "neighbor" ||
+      selected.has(relation.to) ||
+      !["calls", "references"].includes(relation.type) ||
+      !["exact", "framework-derived"].includes(relation.origin.classification)
+    )
+      continue;
+    const symbol = byId.get(relation.to);
+    if (
+      !symbol ||
+      symbol.kind === "class" ||
+      (!behavior.has(symbol.kind) && symbol.kind !== "variable")
+    )
+      continue;
+    const call = relation.type === "calls";
+    if (!dependencies.has(symbol.id) || call) dependencies.set(symbol.id, { symbol, call });
+  }
+  const small = [...dependencies.values()].filter(
+    ({ symbol }) => symbol.range.endLine - symbol.range.startLine + 1 <= 80,
+  );
+  small.sort((a, b) => Number(b.call) - Number(a.call) || compareText(a.symbol.id, b.symbol.id));
+  result.omittedNavigation += dependencies.size - Math.min(small.length, 4);
+  for (const { symbol } of small.slice(0, 4)) {
+    const file = await sourceFile(symbol);
+    selected.set(symbol.id, "neighbor");
+    includeWindow(
+      symbol.id,
+      symbol.file,
+      file,
+      Math.max(1, symbol.range.startLine - 2),
+      Math.min(file.lines.length, symbol.range.endLine + 2),
+    );
+  }
+  result.selected = [...selected].map(([id, role]) => ({ id, role }));
   // Report unread intervals after all candidates have contributed their potentially shared lines.
   for (const request of requested) {
     const file = files.get(request.file);
@@ -298,7 +338,7 @@ export function formatSourceContext(result: ContextResult): string {
   const lines = [
     `Context: ${result.selected.length} selected symbols, ${result.usedLines}/${result.limits.maxLines} source lines; ${result.usedChars}/${result.limits.maxChars} source characters.`,
     `Matches: ${result.matches.map((m) => `${m.name}${m.unmatchedTerms?.length ? ` (unmatched: ${m.unmatchedTerms.join(", ")})` : ""}`).join(", ")}.`,
-    "Scope: matches, direct exact/framework-derived neighbors and file-level reference sites; reference-only classes are not expanded. Source determines behavior.",
+    "Scope: matches, direct exact/framework-derived neighbors, file-level reference sites and up to four small outgoing dependencies; reference-only classes are not expanded. Source determines behavior.",
   ];
   if (result.fileReferences.length)
     lines.push(

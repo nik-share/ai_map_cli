@@ -45,11 +45,12 @@ one-sided coherent corruption; a rescan is required.
   - for partial queries, ranks callable candidates using missing query words in their current source bodies and expands the strongest ties; inspects at most the 50 lexical candidates, with per-term occurrence counts capped at three
   - skips reference-only class neighbors and counts them as omitted navigation; an explicitly selected class still expands normally
   - includes up to four exact/framework-derived incoming file-level calls/references outside test files; a file of at most 80 lines is included in full, otherwise the mapped site has eight context lines on either side, within the shared budgets
+  - after primary source and file references, includes up to four outgoing exact/framework-derived dependencies of direct outgoing neighbors: functions or variables with bodies of at most 80 lines, calls before references; does not recurse or expand incoming callers
   - defaults: 3 matches (1..5), 800 source lines (1..2000), 32,000 source characters including separators (256..64000)
   - verifies paths, hashes and ranges for source-ranking candidates, selected symbols and file references; coalesces overlapping/adjacent source intervals
   - returns `{ query, matches, moreMatches, selected, snippets, omitted, fileReferences, tests, omittedNavigation, usedLines, usedChars, limits }`
   - `snippets` contain `{ file, startLine, endLine, source }`; `omitted` lists unread source ranges and symbol/file IDs excluded by the shared budget; file IDs are navigation targets, so read their printed source ranges directly
-  - test call sites are bounded navigation hints; omitted-navigation counts sum entries excluded by each seed's navigation limits and the shared test-site limit
+  - test call sites are bounded navigation hints; omitted-navigation counts sum entries excluded by each seed's navigation limits, the shared test-site limit, and the small-dependency size/count limits
   - the API validates selected source files; the CLI `context` also checks full map freshness before calling it
 - `formatSourceContext(result) -> string`
   - renders numbered source windows once per contiguous range, with bounded selection/test/omission metadata; metadata is additional to the source budgets
