@@ -73,7 +73,7 @@ export async function buildSourceContext(
           `Source ${symbol.file} changed. Run ai-code-map scan.`,
         );
       const lines = bytes.toString("utf8").split(/\r\n|\n|\r/);
-      if (lines.at(-1) === "") lines.pop();
+      // Preserve the EOF line used by TypeScript ranges and persisted file line counts.
       file = { lines, included: new Set() };
       files.set(symbol.file, file);
     }

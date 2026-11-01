@@ -171,8 +171,9 @@ export default NextJsAnalyzer;
 
 function parseNextRoute(relativePath: string): ParsedNextRoute | undefined {
   const normalized = relativePath.replace(/\\/g, "/").replace(/^src\//, "");
-  if (/^middleware\.(ts|js)$/.test(normalized)) {
-    return { router: "app", kind: "special", route: "/", name: "middleware", params: [] };
+  const specialFile = /^(middleware|proxy)\.(ts|js)$/.exec(normalized)?.[1];
+  if (specialFile) {
+    return { router: "app", kind: "special", route: "/", name: specialFile, params: [] };
   }
   if (!normalized.startsWith("app/") && !normalized.startsWith("pages/")) return undefined;
 

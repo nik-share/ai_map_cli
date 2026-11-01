@@ -3,7 +3,13 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { checkFreshness, NextJsAnalyzer, scanProject } from "../src/index.js";
+import {
+  buildSourceContext,
+  checkFreshness,
+  NextJsAnalyzer,
+  readSymbolSource,
+  scanProject,
+} from "../src/index.js";
 import { createFixture, readPersistedMap, removeProject, runCli } from "./helpers.js";
 
 const roots: string[] = [];
@@ -19,6 +25,67 @@ afterEach(async () => {
 });
 
 describe("Next.js support", () => {
+  it.each([
+    { name: "LF", newline: "\n", trailing: true },
+    { name: "CRLF", newline: "\r\n", trailing: true },
+    { name: "no final newline", newline: "\n", trailing: false },
+  ])("reads route context through the CLI with $name", async ({ newline, trailing }) => {
+    const root = await fixture("next-app");
+    const file = "app/api/eof/route.ts";
+    const source =
+      ["export function GET() {", "  return null;", "}"].join(newline) + (trailing ? newline : "");
+    await mkdir(join(root, "app/api/eof"), { recursive: true });
+    await writeFile(join(root, file), source);
+    const { map } = await scanProject({ root });
+    const found = await runCli(["find", file, "--root", root, "--json"]);
+    expect(found.code, found.stderr).toBe(0);
+    const matches = (JSON.parse(found.stdout) as { matches: { id: string; kind: string }[] })
+      .matches;
+    const route = matches.find((symbol) => symbol.kind === "next-route-handler");
+    if (!route) throw new Error("Expected an indexed route handler");
+
+    const [read, context] = await Promise.all([
+      runCli(["read", route.id, "--root", root, "--json"]),
+      runCli(["context", route.id, "--root", root, "--json"]),
+    ]);
+    expect(read.code, read.stderr).toBe(0);
+    expect(context.code, context.stderr).toBe(0);
+    const normalizedSource = source.replace(/\r\n/g, "\n");
+    expect((JSON.parse(read.stdout) as { source: string }).source).toBe(normalizedSource);
+    const packet = JSON.parse(context.stdout) as { snippets: { file: string; source: string }[] };
+    expect(packet.snippets.find((snippet) => snippet.file === file)?.source).toBe(normalizedSource);
+
+    const symbol = map.symbols.find((symbol) => symbol.id === route.id);
+    if (!symbol) throw new Error("Expected the scanned route handler");
+    symbol.range.endLine += 1;
+    await expect(readSymbolSource(map, route.id, { root })).rejects.toMatchObject({
+      code: "INVALID_SOURCE_RANGE",
+    });
+    await expect(buildSourceContext(map, route.id, { root })).rejects.toMatchObject({
+      code: "INVALID_SOURCE_RANGE",
+    });
+  });
+
+  it.each(["proxy.ts", "src/proxy.ts", "proxy.js", "src/proxy.js"])(
+    "indexes and reads the wrapped Next.js proxy in %s",
+    async (file) => {
+      const root = await fixture("next-app");
+      await mkdir(join(root, "src"), { recursive: true });
+      const source = "const wrap = (handler) => handler;\nexport default wrap(() => null);\n";
+      await writeFile(join(root, file), source);
+      const { map } = await scanProject({ root });
+      const proxy = map.symbols.find(
+        (symbol) => symbol.kind === "next-special-file" && symbol.file === file,
+      );
+      expect(proxy).toMatchObject({ name: "proxy", exported: true, defaultExport: true });
+      if (!proxy) throw new Error("Expected an indexed Next.js proxy");
+      expect((await readSymbolSource(map, proxy.id, { root })).source).toBe(source);
+      expect((await buildSourceContext(map, proxy.id, { root })).snippets).toEqual([
+        expect.objectContaining({ file, source }),
+      ]);
+    },
+  );
+
   it.each(["app", "pages"] as const)("preserves %s route facts under src", async (router) => {
     const root = await fixture(router === "app" ? "next-app" : "next-pages");
     const before = await scanProject({ root, analyzers: [new NextJsAnalyzer()] });

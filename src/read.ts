@@ -54,7 +54,7 @@ export async function readSymbolSource(
       `Source ${symbol.file} changed. Run ai-code-map scan before reading its mapped range.`,
     );
   const lines = bytes.toString("utf8").split(/\r\n|\n|\r/);
-  if (lines.at(-1) === "") lines.pop();
+  // Preserve the EOF line used by TypeScript ranges and persisted file line counts.
   const first = Math.max(1, symbol.range.startLine - 2);
   const last = Math.min(lines.length, symbol.range.endLine + 2);
   if (symbol.range.startLine < 1 || symbol.range.endLine > lines.length || first > last)

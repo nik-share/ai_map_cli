@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Preserve end-of-file line numbering in `read` and `context` so Next.js route handlers ending in LF or CRLF remain readable.
+- Recognize root and `src` `proxy.ts`/`proxy.js` files as Next.js special files. Update the Next.js analyzer version so existing maps require a rescan.
+
 ## 2026-11-01
 
 ### 0.1.0-alpha.4
