@@ -200,11 +200,11 @@ function formatSearchResult(result: SymbolSearchResult): string {
   return [
     `Symbols: ${result.matches.length}/${result.total} shown${result.truncated ? "; refine the query for omitted matches" : ""}`,
     ...result.matches.map(
-      ({ id, kind, file, range }) =>
-        `${id} [${kind}]\n  ${file}:${range.startLine}:${range.startColumn}-${range.endLine}:${range.endColumn}`,
+      ({ id, kind, file, range, unmatchedTerms }) =>
+        `${id} [${kind}]${unmatchedTerms?.length ? ` (partial; unmatched: ${unmatchedTerms.join(", ")})` : ""}\n  ${file}:${range.startLine}:${range.startColumn}-${range.endLine}:${range.endColumn}`,
     ),
     result.matches.length
-      ? "Use ai-code-map show '<id>' with a listed ID."
+      ? "Read the source ranges above; use ai-code-map show '<id>' for relations."
       : "No matches. Try other words or use rg; only indexed symbols are searchable.",
   ].join("\n");
 }

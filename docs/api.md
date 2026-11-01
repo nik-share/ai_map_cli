@@ -42,8 +42,12 @@ one-sided coherent corruption; a rescan is required.
   - searches indexed names and paths; returns stable IDs and source ranges
   - options: `{ limit?: number }`, default 10, integer 1..50; invalid limits throw `RangeError`
   - empty/whitespace query throws; no matches returns an empty array
-  - returns `{ query, total, truncated, matches: [{ id, name, kind, file, range }] }`
+  - returns `{ query, total, truncated, matches: [{ id, name, kind, file, range, unmatchedTerms? }] }`
   - deterministic lexical ranking and bounded typo hints; does not resolve guessed names as exact symbols
+  - word matching normalizes common English plurals and favors name matches over path matches
+  - whitespace-separated queries with at least three distinct normalized words may return partial matches after full matches and typo hints; at least two words and half the query must match, including a word in the symbol name
+  - only partial matches include `unmatchedTerms`, listing normalized query words absent from that symbol's name and path; this is lexical overlap, not semantic equivalence
+  - qualified file selectors remain restricted to that file; partial matching does not broaden them
 
 ## Analyzer constructors
 

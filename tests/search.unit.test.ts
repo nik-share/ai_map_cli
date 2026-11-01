@@ -51,6 +51,100 @@ const symbols = [
 const map = { symbols } as CodeMap;
 
 describe("findSymbols", () => {
+  it("finds notification actions from partially matching task words and reports missing terms", () => {
+    const fixtures = {
+      symbols: [
+        symbol(
+          "class:src/notifications/mark.ts#Manager",
+          "Manager",
+          "src/notifications/mark.ts",
+          "class",
+        ),
+        symbol(
+          "function:src/notifications/query.ts#fetchNotifications",
+          "fetchNotifications",
+          "src/notifications/query.ts",
+        ),
+        symbol(
+          "hook:src/notifications/hooks.ts#useMarkAsViewed",
+          "useMarkAsViewed",
+          "src/notifications/hooks.ts",
+          "react-hook",
+        ),
+        notificationMethod,
+      ],
+    } as CodeMap;
+    const result = findSymbols(fixtures, "notification mark read", { limit: 1 });
+    expect(result).toMatchObject({
+      total: 2,
+      truncated: true,
+      matches: [{ id: notificationMethod.id, unmatchedTerms: ["read"] }],
+    });
+    expect(
+      findSymbols(
+        { symbols: [...fixtures.symbols].reverse() } as CodeMap,
+        "notification mark read",
+      ),
+    ).toEqual(findSymbols(fixtures, "notification mark read"));
+  });
+
+  it("ranks full word matches above partial matches and name matches above path-only matches", () => {
+    const exact = symbol(
+      "function:src/notifications/read.ts#markNotificationsAsRead",
+      "markNotificationsAsRead",
+      "src/notifications/read.ts",
+    );
+    const pathOnly = symbol(
+      "class:src/notification/mark/read.ts#Configuration",
+      "Configuration",
+      "src/notification/mark/read.ts",
+      "class",
+    );
+    const result = findSymbols(
+      { symbols: [notificationMethod, pathOnly, exact] } as CodeMap,
+      "notification mark read",
+    );
+    expect(result.matches.map((item) => item.id)).toEqual([
+      exact.id,
+      pathOnly.id,
+      notificationMethod.id,
+    ]);
+    expect(result.matches.slice(0, 2).every((item) => !("unmatchedTerms" in item))).toBe(true);
+    expect(
+      findSymbols({ symbols: [notificationMethod, exact] } as CodeMap, notificationMethod.id)
+        .matches[0]?.id,
+    ).toBe(notificationMethod.id);
+  });
+
+  it("requires meaningful coverage and never broadens a qualified selector to unrelated files", () => {
+    expect(findSymbols(map, "notification delete archive").matches).toEqual([]);
+    expect(findSymbols(map, "notification mark zebra rocket lunar").matches).toEqual([]);
+    expect(findSymbols(map, "notification read").matches).toEqual([]);
+    expect(findSymbols(map, "src/other.ts#markNotificationsAsViewed").matches).toEqual([]);
+    expect(findSymbols(map, "notification notification read").matches).toEqual([]);
+  });
+
+  it("normalizes common plurals without merging process, status, or class words", () => {
+    expect(findSymbols(map, "notification mark").matches[0]?.id).toBe(notificationMethod.id);
+    const fixtures = {
+      symbols: [
+        symbol("function:src/query.ts#queryCategories", "queryCategories", "src/query.ts"),
+        symbol(
+          "class:src/process/status.ts#ProcessStatusClass",
+          "ProcessStatusClass",
+          "src/process/status.ts",
+          "class",
+        ),
+      ],
+    } as CodeMap;
+    expect(findSymbols(fixtures, "query category").matches.map((item) => item.name)).toEqual([
+      "queryCategories",
+    ]);
+    expect(findSymbols(fixtures, "process status class").matches.map((item) => item.name)).toEqual([
+      "ProcessStatusClass",
+    ]);
+  });
+
   it("prioritizes exact stable IDs and names", () => {
     const byId = findSymbols(map, managerChangeService.id);
     const byName = findSymbols(map, "ManagerChangeRequestService");

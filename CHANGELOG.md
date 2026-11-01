@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Improve multiword symbol search with common plural normalization, name-aware ranking, and explicitly labeled partial matches.
+
 - Add compact text `show` with full source ranges, grouped relations, and explicit omission counts.
 - Preserve verbose output through `show --full` and complete records through `show --json`.
 - Add `find` / `findSymbols` for bounded symbol discovery and typo suggestions on failed `show` selectors.

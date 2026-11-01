@@ -15,6 +15,8 @@ export interface SymbolSearchMatch {
   kind: SymbolKind;
   file: string;
   range: SourceRange;
+  /** Normalized query words not found in a partial word match. */
+  unmatchedTerms?: string[];
 }
 
 export interface SymbolSearchResult {
@@ -38,15 +40,47 @@ export function findSymbols(
   }
 
   const qualified = splitQualifiedSelector(normalized);
+  const queryWords = [...new Set(words(normalized))];
   const ranked = map.symbols
-    .map((symbol) => ({ symbol, rank: matchRank(symbol, normalized, qualified) }))
-    .filter(
-      (candidate): candidate is { symbol: SymbolRecord; rank: number } =>
-        candidate.rank !== undefined,
-    )
-    .sort((left, right) => left.rank - right.rank || compareText(left.symbol.id, right.symbol.id));
+    .map((symbol) => {
+      const nameWords = new Set(words(symbol.name));
+      const symbolWords = new Set([...nameWords, ...words(symbol.file)]);
+      const unmatchedTerms = queryWords.filter((word) => !symbolWords.has(word));
+      const matched = queryWords.length - unmatchedTerms.length;
+      const nameMatches = queryWords.filter((word) => nameWords.has(word)).length;
+      let rank = matchRank(
+        symbol,
+        normalized,
+        qualified,
+        queryWords.length > 0 && unmatchedTerms.length === 0,
+      );
+      // Partial matches need both context and a name hit, not just a shared directory.
+      if (
+        rank === undefined &&
+        !qualified &&
+        /\s/.test(normalized) &&
+        queryWords.length >= 3 &&
+        matched >= Math.max(2, Math.ceil(queryWords.length / 2)) &&
+        nameMatches > 0
+      )
+        rank = 9;
+      return rank === undefined
+        ? undefined
+        : { symbol, rank, matched, nameMatches, unmatchedTerms };
+    })
+    .filter((candidate): candidate is NonNullable<typeof candidate> => candidate !== undefined)
+    .sort(
+      (left, right) =>
+        left.rank - right.rank ||
+        right.matched - left.matched ||
+        right.nameMatches - left.nameMatches ||
+        compareText(left.symbol.id, right.symbol.id),
+    );
 
-  const matches = ranked.slice(0, limit).map(({ symbol }) => toMatch(symbol));
+  const matches = ranked.slice(0, limit).map(({ symbol, rank, unmatchedTerms }) => ({
+    ...toMatch(symbol),
+    ...(rank === 9 ? { unmatchedTerms } : {}),
+  }));
   return {
     query: normalized,
     total: ranked.length,
@@ -59,6 +93,7 @@ function matchRank(
   symbol: SymbolRecord,
   query: string,
   qualified: { file: string; member: string } | undefined,
+  allWordsMatch: boolean,
 ): number | undefined {
   if (symbol.id === query) return 0;
   if (symbol.name === query) return 1;
@@ -84,9 +119,7 @@ function matchRank(
   if (lowerName.includes(lowerQuery)) return 5;
   if (lowerFile.includes(lowerQuery)) return 6;
 
-  const queryWords = words(query);
-  const symbolWords = new Set(words(`${symbol.name} ${symbol.file}`));
-  if (queryWords.length > 0 && queryWords.every((word) => symbolWords.has(word))) return 7;
+  if (allWordsMatch) return 7;
 
   if (/^[a-z0-9]+$/i.test(query)) {
     const compactQuery = compact(query);
@@ -115,7 +148,13 @@ function words(value: string): string[] {
     .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
     .toLowerCase()
     .split(/[^a-z0-9]+/)
-    .filter(Boolean);
+    .filter(Boolean)
+    .map((word) => {
+      if (word.length > 4 && word.endsWith("ies")) return `${word.slice(0, -3)}y`;
+      if (word.length > 3 && word.endsWith("s") && !/(ss|us|is)$/.test(word))
+        return word.slice(0, -1);
+      return word;
+    });
 }
 
 function compact(value: string): string {

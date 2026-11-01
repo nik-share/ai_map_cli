@@ -93,6 +93,10 @@ describe("programmatic API", () => {
 describe("CLI observable behavior", () => {
   it("finds usable selectors, suggests typos, and supports compact/full show without changing JSON", async () => {
     const root = await fixture("typescript-node");
+    await writeFile(
+      join(root, "src/notifications.ts"),
+      "export function markNotificationsAsViewed() {}\n",
+    );
     await scanProject({ root });
     const map = await loadCodeMap({ root });
     const calculator = symbolNamed(map, "Calculator");
@@ -104,6 +108,15 @@ describe("CLI observable behavior", () => {
     const readable = await runCli(["find", "Calculator", "--root", root]);
     expect(readable.stdout).toContain(calculator.id);
     expect(readable.stdout).toContain(`src/service.ts:${calculator.range.startLine}`);
+    expect(readable.stdout).toContain("Read the source ranges above");
+    const partial = await runCli(["find", "notification mark read", "--root", root]);
+    expect(partial.code, partial.stderr).toBe(0);
+    expect(partial.stdout).toContain("markNotificationsAsViewed");
+    expect(partial.stdout).toContain("partial; unmatched: read");
+    const partialJson = await runCli(["find", "notification mark read", "--root", root, "--json"]);
+    expect(parseCliJson(partialJson)).toMatchObject({
+      matches: [{ name: "markNotificationsAsViewed", unmatchedTerms: ["read"] }],
+    });
     const compact = await runCli(["show", calculator.id, "--root", root, "--limit", "1"]);
     expect(compact.code, compact.stderr).toBe(0);
     expect(compact.stdout).toContain("Compact view");

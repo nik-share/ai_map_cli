@@ -88,7 +88,15 @@ indexed candidates; it never silently selects a different symbol.
 
 Searches indexed symbol names and paths. Quote multiword queries, for example
 `ai-code-map find "manager change"`. Exact names/IDs rank first, followed by prefix/substring,
-word matches, and bounded typo matching. This is lexical search, not semantic search.
+word matches, and bounded typo matching. Word matching normalizes common English plurals
+and favors matches in symbol names over paths. Whitespace-separated queries with at least three distinct words
+can also return partial matches: at least two words and half the query must match, including
+one word in the symbol name. These rank below full matches and typo hints. Partial results
+show which normalized terms were unmatched. This is lexical search, not semantic search;
+`read` is not treated as a synonym of `viewed`. For example, `notification mark read` can
+find `markNotificationsAsViewed` through `notification` and `mark`.
+
+Read the returned source range directly. Use `show` when symbol relations are needed.
 
 Results include stable IDs usable by `show`, kinds, and full source ranges. The default is ten
 matches; `--limit <1..50>` adjusts this. `--json` returns `{ query, total, truncated, matches }`.
