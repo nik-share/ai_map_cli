@@ -224,12 +224,13 @@ function declarationIdMap(
   return result;
 }
 
-function collectBehaviorRelations(
+export function collectBehaviorRelations(
   context: AnalysisContext,
   declarationIds: Map<ts.Declaration, string>,
   output: RelationRecord[],
+  scope = { node: context.sourceFile as ts.Node, owner: fileId(context.relativePath) },
 ): void {
-  let currentOwner = fileId(context.relativePath);
+  let currentOwner = scope.owner;
   const walk = (node: ts.Node): void => {
     const previousOwner = currentOwner;
     if (
@@ -299,7 +300,8 @@ function collectBehaviorRelations(
     node.forEachChild(walk);
     currentOwner = previousOwner;
   };
-  walk(context.sourceFile);
+  walk(scope.node);
+  if (!ts.isSourceFile(scope.node)) return;
 
   for (const statement of context.sourceFile.statements) {
     if (!ts.isClassDeclaration(statement)) continue;
@@ -561,7 +563,7 @@ function enclosingImportDeclaration(declaration: ts.Declaration): ts.ImportDecla
   return undefined;
 }
 
-function declarationToId(declaration: ts.Declaration, filePath: string): string | undefined {
+export function declarationToId(declaration: ts.Declaration, filePath: string): string | undefined {
   if (ts.isFunctionDeclaration(declaration)) {
     return symbolId("function", filePath, declaration.name?.text ?? "default");
   }

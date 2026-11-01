@@ -4,6 +4,8 @@ import ts from "typescript";
 
 import { NEXTJS_ANALYZER_VERSION, SCHEMA_VERSION } from "../constants.js";
 import { symbolId } from "../ids.js";
+import { relativePosix } from "../utils/path.js";
+import { collectBehaviorRelations, declarationToId } from "./core.js";
 import type {
   AnalysisContribution,
   AnalysisContext,
@@ -123,6 +125,7 @@ export class NextJsAnalyzer implements FrameworkAnalyzer {
           },
         }),
       );
+      if (symbols[0]) connectEntrypoints(context, route, symbols[0].id, relations);
       return { symbols, relations, frameworks: ["nextjs"] };
     }
 
@@ -139,7 +142,65 @@ export class NextJsAnalyzer implements FrameworkAnalyzer {
       }),
     );
 
+    if (symbols[0]) connectEntrypoints(context, route, symbols[0].id, relations);
     return { symbols, relations, frameworks: ["nextjs"] };
+  }
+}
+
+/** Attach only exported entrypoints, never every declaration or import in the file. */
+function connectEntrypoints(
+  context: AnalysisContext,
+  route: ParsedNextRoute,
+  from: string,
+  relations: RelationRecord[],
+): void {
+  const module = context.checker.getSymbolAtLocation(context.sourceFile);
+  if (!module) return;
+  for (const exported of context.checker.getExportsOfModule(module)) {
+    const entrypoint =
+      route.kind === "route" && route.router === "app"
+        ? ROUTE_METHODS.has(exported.name)
+        : exported.name === "default" ||
+          (["proxy", "middleware"].includes(route.name) && exported.name === route.name);
+    if (
+      !entrypoint ||
+      exported.declarations?.some(
+        (node) => ts.isExportSpecifier(node) && (node.isTypeOnly || node.parent.parent.isTypeOnly),
+      )
+    )
+      continue;
+    const target =
+      exported.flags & ts.SymbolFlags.Alias ? context.checker.getAliasedSymbol(exported) : exported;
+    if (!(target.flags & ts.SymbolFlags.Value)) continue;
+    const declaration = target.valueDeclaration;
+    if (!declaration) continue;
+    const file = relativePosix(context.root, declaration.getSourceFile().fileName);
+    if (file !== context.relativePath && !context.indexedSourcePaths?.has(file)) continue;
+    const id = declarationToId(declaration, file);
+    const origin =
+      exported.declarations?.find((node) => node.getSourceFile() === context.sourceFile) ??
+      context.sourceFile;
+    if (id && id !== from) {
+      relations.push(
+        makeRelation(from, "references", id, context, origin, 1, "Next.js exported entrypoint"),
+      );
+    }
+    // A re-export links to the implementation; do not re-attribute another file's body.
+    if (file !== context.relativePath) continue;
+    const dependencies: RelationRecord[] = [];
+    collectBehaviorRelations(context, new Map(), dependencies, { node: declaration, owner: from });
+    for (const dependency of dependencies) {
+      if (dependency.origin.classification !== "exact") continue;
+      relations.push({
+        ...dependency,
+        origin: {
+          ...dependency.origin,
+          classification: "framework-derived",
+          analyzer: "nextjs",
+          explanation: "TypeScript-resolved dependency of a Next.js entrypoint",
+        },
+      });
+    }
   }
 }
 

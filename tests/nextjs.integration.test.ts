@@ -25,6 +25,111 @@ afterEach(async () => {
 });
 
 describe("Next.js support", () => {
+  it("connects route context to exported handlers and their dependencies only", async () => {
+    const root = await fixture("next-app");
+    await mkdir(join(root, "app/api/linked"), { recursive: true });
+    await writeFile(
+      join(root, "app/dependencies.ts"),
+      [
+        "export function validate() { return true; }",
+        "export function save() { return 1; }",
+        "export function unrelated() { return false; }",
+      ].join("\n"),
+    );
+    await writeFile(
+      join(root, "app/api/linked/route.ts"),
+      [
+        'import { validate, save, unrelated } from "../../dependencies";',
+        "export function POST() { return validate() && save(); }",
+        "function hidden() { return unrelated(); }",
+        "const local = () => validate(); export { local as GET };",
+      ].join("\n"),
+    );
+    const { map } = await scanProject({ root });
+    const id = "next:app/api/linked/route.ts#route-handler";
+    const read = await readSymbolSource(map, id, { root });
+    expect(read.navigation?.links.map((link) => link.id)).toEqual(
+      expect.arrayContaining([
+        "function:app/api/linked/route.ts#POST",
+        "function:app/api/linked/route.ts#local",
+        "function:app/dependencies.ts#validate",
+        "function:app/dependencies.ts#save",
+      ]),
+    );
+    expect(map.relations.some((r) => r.from === id && r.to.endsWith("#unrelated"))).toBe(false);
+    const context = await runCli(["context", id, "--root", root, "--json"]);
+    expect(context.code, context.stderr).toBe(0);
+    expect((JSON.parse(context.stdout) as { selected: unknown[] }).selected).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: "function:app/dependencies.ts#validate" }),
+        expect.objectContaining({ id: "function:app/dependencies.ts#save" }),
+      ]),
+    );
+  });
+
+  it.each(["proxy", "middleware"])(
+    "connects wrapped %s callbacks without unrelated calls",
+    async (name) => {
+      const root = await fixture("next-app");
+      await writeFile(
+        join(root, "app/auth.ts"),
+        [
+          "export function wrap(fn: () => boolean) { return fn; }",
+          "export function validateToken() { return true; }",
+          "export function unrelated() { return false; }",
+        ].join("\n"),
+      );
+      await writeFile(
+        join(root, `${name}.ts`),
+        [
+          'import { wrap, validateToken, unrelated } from "./app/auth";',
+          "export default wrap(() => validateToken());",
+          "function hidden() { return unrelated(); }",
+        ].join("\n"),
+      );
+      const { map } = await scanProject({ root });
+      const id = `next:${name}.ts#${name}`;
+      expect((await readSymbolSource(map, id, { root })).navigation?.links).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            id: "function:app/auth.ts#validateToken",
+            classification: "framework-derived",
+          }),
+        ]),
+      );
+      const context = await buildSourceContext(map, id, { root });
+      expect(context.selected).toContainEqual({
+        id: "function:app/auth.ts#validateToken",
+        role: "neighbor",
+      });
+      expect(map.relations.some((r) => r.from === id && r.to.endsWith("#unrelated"))).toBe(false);
+    },
+  );
+
+  it("links re-exported route handlers to indexed implementations", async () => {
+    const root = await fixture("next-app");
+    await mkdir(join(root, "app/api/reexport"), { recursive: true });
+    await writeFile(join(root, "app/handler.ts"), "export function handle() { return 42; }\n");
+    await writeFile(
+      join(root, "app/api/reexport/route.ts"),
+      'export { handle as GET } from "../../handler";\n',
+    );
+    const { map } = await scanProject({ root });
+    const context = await buildSourceContext(map, "next:app/api/reexport/route.ts#route-handler", {
+      root,
+    });
+    expect(context.selected).toContainEqual({
+      id: "function:app/handler.ts#handle",
+      role: "neighbor",
+    });
+    expect(context.snippets).toContainEqual(
+      expect.objectContaining({
+        file: "app/handler.ts",
+        source: "export function handle() { return 42; }\n",
+      }),
+    );
+  });
+
   it.each([
     { name: "LF", newline: "\n", trailing: true },
     { name: "CRLF", newline: "\r\n", trailing: true },
