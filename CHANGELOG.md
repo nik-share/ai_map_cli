@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 2026-11-02
+
+### 0.1.0-alpha.6
+
+- Simplify the README to purpose, installation, and basic usage; move detailed CLI, configuration, and agent guidance to `docs/guide.md`.
+- Include the Next.js navigation and source-reading improvements recorded in alpha.4 and alpha.5. Existing maps from older analyzer versions require a rescan.
+
 ## 2026-11-01
 
 ### 0.1.0-alpha.5
