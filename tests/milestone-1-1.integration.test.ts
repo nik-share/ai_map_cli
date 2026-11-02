@@ -325,6 +325,7 @@ describe("Milestone 1.1 semantic correctness and freshness", () => {
 
   // Rejects tracking only root/workspace manifests or existing files: package-scope maps, absent
   // package probes, @types directory listings, and symlink targets all participate in resolution.
+  // Repeated compiler scans need more than the default 20 seconds on shared CI runners.
   it("tracks package-scope maps and package-resolution filesystem observations", async () => {
     const nestedPackagePath = "packages/nested/package.json";
     const nestedManifest = {
@@ -467,7 +468,7 @@ describe("Milestone 1.1 semantic correctness and freshness", () => {
     expect(symbolNamed(afterLinkRetarget.map, "linkedResult").signature).toMatch(/number/);
     expect(symbolNamed(afterLinkRetarget.map, "linkedResult").signature).not.toMatch(/string/);
     expect((await checkFreshness({ root: dependencyRoot })).current).toBe(true);
-  });
+  }, 60_000);
 
   // Rejects treating manifest.json as the entire map commit or trusting independently valid
   // records whose hashes agree but whose imports, units, ranges, or ownership contradict peers.
