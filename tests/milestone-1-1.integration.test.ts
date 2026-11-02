@@ -1973,6 +1973,7 @@ describe("Milestone 1.1 semantic correctness and freshness", () => {
 
   // Rejects mutable name/version equality, overly broad parser recognition, and trust in a
   // manifest or companion whose declared integrity no longer covers its persisted bytes.
+  // Repeated compiler scans need more than the default 20 seconds on shared CI runners.
   it("authenticates built-in producers and every manifest or companion integrity field", async () => {
     const root = await createProject({
       "package.json": packageJson("producer-provenance"),
@@ -2123,5 +2124,5 @@ describe("Milestone 1.1 semantic correctness and freshness", () => {
     expect(repaired.wrote).toBe(true);
     expect(builtInAnalysis).toHaveBeenCalled();
     await expect(loadCodeMap({ root })).resolves.toEqual(repaired.map);
-  });
+  }, 60_000);
 });
